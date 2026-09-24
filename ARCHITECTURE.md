@@ -1,6 +1,6 @@
 # Retire architecture
 
-Version: `0.1.0`
+Version: `0.2.0`
 
 Retire is an independent repository and deployment. AVA Platform is the source of truth for architecture, navigation, responsive behaviour, PWA boundaries, security, backup/restore and the canonical design language. Retire owns the retirement conversation, calculations, official retirement datasets and domain workflow; it does not copy AVA Platform or 5pay source.
 
@@ -13,13 +13,13 @@ Retire is an independent repository and deployment. AVA Platform is the source o
 
 ## Flow and calculation contract
 
-Understand → Simplify → Quantify → Visualize → Converse → Discover → Deepen → Explore → Present. The first release implements the core conversation through the retirement gap; medical need is explicitly separate and legacy is an independent objective.
+Understand → Simplify → Quantify → Visualize → Converse → Discover → Deepen → Explore → Present. The conversation obtains current age before desired retirement age, then asks only for approximate resources, retirement earmarking, broad categories, purchasing power and a visible growth assumption. Medical need is explicitly separate and legacy is an independent objective.
 
 All gap comparisons use retirement-date values: future lifestyle need versus projected existing resources. Current resources are projected using the user-visible growth assumption before comparison. Inflation continues through every retirement stage even when a stage ratio is reduced.
 
 ## Dynamic return plans
 
-`returnPlans` is normalized from official `returnPlans`, `return_plans`, or the Sheet-shaped `回報表設定`. Each plan requires `plan_id`, sheet name, display name, sort order, and enabled flag. Stable `planId` is the identity. Each return row is independently read as `policyYear`, `withdrawalRate`/`withdrawalPercent`, and `multiplier`; no fixed plan list, withdrawal pattern, interpolation, or inferred percentage is used. Adding an enabled registry row and matching table makes a plan available after refresh without an app-code change.
+`returnPlans` is normalized from the GAS envelope without dropping `payload.data`, from official `returnPlans`, `return_plans`, or the Sheet-shaped `回報表設定`. Each enabled registry row and matching return sheet makes a plan available after refresh without an app-code change. Stable `planId` is the identity. Each return row is independently read as `policyYear`, `withdrawalRate`/`withdrawalPercent`, and `multiplier`; no fixed plan list, withdrawal pattern, interpolation, or inferred percentage is used.
 
 ## GAS contract
 
