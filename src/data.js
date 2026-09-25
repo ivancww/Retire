@@ -3,7 +3,7 @@ export const OFFICIAL_CACHE_KEY = 'retire:official-cache:v1';
 export const USER_DATA_KEY = 'retire:user-data:v1';
 
 export const fallbackOfficial = {
-  version: 'fallback-0.2.0', inflationRate: 0.025, resourceGrowthRate: 0,
+  version: 'fallback-0.3.0', inflationRate: 0.025, resourceGrowthRate: 0,
   stages: [{ id: 'early', label: '60–69 歲', startAge: 60, endAge: 69, ratio: 100 }, { id: 'middle', label: '70–79 歲', startAge: 70, endAge: 79, ratio: 80 }, { id: 'late', label: '80–90 歲', startAge: 80, endAge: 90, ratio: 60 }],
   returnPlans: []
 };
