@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { projectResources, purchasingPowerToday, retirementGap, retirementMonthlyNeed, retirementTarget, stageSpending, yearsUntilRetirement, validateAges, planProjection } from '../src/calculation.js';
+
+test('years use customer current age, not a hard-coded age', () => { assert.equal(yearsUntilRetirement(35, 60), 25); assert.equal(yearsUntilRetirement(45, 60), 15); assert.equal(yearsUntilRetirement(60, 60), 0); });
+test('invalid and unreasonable ages are rejected', () => { assert.equal(yearsUntilRetirement(70, 60), null); assert.equal(validateAges(17, 60, 90).valid, false); assert.equal(validateAges(35, 60, 60).valid, false); assert.equal(validateAges(35, 60, 90).valid, true); });
+test('inflation produces the retirement-date monthly need', () => assert.equal(Math.round(retirementMonthlyNeed(30000, .025, 20)), 49158));
+test('stage ratios do not stop inflation between stages', () => { const rows = stageSpending({ monthlyNeed: 49158, retirementAge: 60, planningAge: 90, inflationRate: .025, stages: [{ startAge: 60, endAge: 69, ratio: 100 }, { startAge: 70, endAge: 79, ratio: 80 }, { startAge: 80, endAge: 90, ratio: 60 }] }); assert.ok(rows[1].monthlyStart > rows[0].monthlyStart * .8); });
+test('different stage age bands and percentages affect the calculation', () => { const common = { monthlyNeed: 50000, retirementAge: 60, planningAge: 90, inflationRate: .02 }; const allFull = stageSpending({ ...common, stages: [{ startAge: 60, endAge: 90, ratio: 100 }] }); const reduced = stageSpending({ ...common, stages: [{ startAge: 60, endAge: 69, ratio: 100 }, { startAge: 70, endAge: 90, ratio: 50 }] }); assert.ok(reduced[0].total + reduced[1].total < allFull[0].total); });
+test('gap compares retirement-date need with retirement-date resources', () => { const projected = projectResources([{ amount: 100, growthRate: 10 }], 10); assert.equal(retirementGap(300, projected), 300 - projected); });
+test('explicit legacy amount is a separate part of the target', () => assert.equal(retirementTarget(1000, 250), 1250));
+test('purchasing power is discounted, not confused with nominal value', () => assert.equal(Math.round(purchasingPowerToday(2000000, .025, 20)), 1220853));
+test('return rows are read independently for irregular patterns', () => { const patterns = [[5, 6, 7, 8], [10, 9, 8, 7], [5, 5, 8, 3, 10, 0, 12]]; patterns.forEach((rates) => { const plan = { rows: rates.map((rate, i) => ({ policyYear: i + 1, withdrawalRate: rate, multiplier: 1 + i })) }; rates.forEach((rate, i) => assert.equal(planProjection({ principal: 100, policyYear: i + 1, plan }).withdrawalRate, rate)); }); });
