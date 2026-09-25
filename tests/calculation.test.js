@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectResources, purchasingPowerToday, retirementGap, retirementMonthlyNeed, retirementTarget, stageSpending, yearsUntilRetirement, validateAges, planProjection } from '../src/calculation.js';
+import { contributionTotal, earmarkedAmount, earmarkedPair, formatMoney, planProjection, projectResources, purchasingPowerToday, retirementGap, retirementMonthlyNeed, retirementTarget, stageSpending, yearsUntilRetirement, validateAges } from '../src/calculation.js';
 
 test('years use customer current age, not a hard-coded age', () => { assert.equal(yearsUntilRetirement(35, 60), 25); assert.equal(yearsUntilRetirement(45, 60), 15); assert.equal(yearsUntilRetirement(60, 60), 0); });
 test('invalid and unreasonable ages are rejected', () => { assert.equal(yearsUntilRetirement(70, 60), null); assert.equal(validateAges(17, 60, 90).valid, false); assert.equal(validateAges(35, 60, 60).valid, false); assert.equal(validateAges(35, 60, 90).valid, true); });
@@ -11,3 +11,8 @@ test('gap compares retirement-date need with retirement-date resources', () => {
 test('explicit legacy amount is a separate part of the target', () => assert.equal(retirementTarget(1000, 250), 1250));
 test('purchasing power is discounted, not confused with nominal value', () => assert.equal(Math.round(purchasingPowerToday(2000000, .025, 20)), 1220853));
 test('return rows are read independently for irregular patterns', () => { const patterns = [[5, 6, 7, 8], [10, 9, 8, 7], [5, 5, 8, 3, 10, 0, 12]]; patterns.forEach((rates) => { const plan = { rows: rates.map((rate, i) => ({ policyYear: i + 1, withdrawalRate: rate, multiplier: 1 + i })) }; rates.forEach((rate, i) => assert.equal(planProjection({ principal: 100, policyYear: i + 1, plan }).withdrawalRate, rate)); }); });
+test('earmarked percentage is calculated from existing resources and stays consistent with amount mode', () => { assert.equal(earmarkedAmount(2000000, 'percent', 50), 1000000); const pair = earmarkedPair(2000000, 'amount', 1000000); assert.equal(pair.amount, 1000000); assert.equal(pair.percent, 50); });
+test('contribution total is annual contribution multiplied by contribution years', () => assert.equal(contributionTotal(100000, 10), 1000000));
+test('money formatting uses thousands separators', () => { assert.match(formatMoney(30000), /30,000/); assert.match(formatMoney(23326171), /23,326,171/); });
+test('official multiplier is translated into money using exact policy year and total contribution basis', () => { const result = planProjection({ principal: 100000, contributionYears: 5, officialContributionYears: 5, policyYear: 8, plan: { rows: [{ policyYear: 8, withdrawalRate: 7, multiplier: 1.8 }] } }); assert.equal(result.totalContribution, 500000); assert.equal(result.futureValue, 900000); assert.equal(result.annualWithdrawal, 63000); });
+test('official scaling is unavailable when the customer period differs from official basis', () => { const result = planProjection({ principal: 100000, contributionYears: 10, officialContributionYears: 5, policyYear: 8, plan: { rows: [{ policyYear: 8, withdrawalRate: 7, multiplier: 1.8 }] } }); assert.equal(result.available, false); });

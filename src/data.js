@@ -3,7 +3,7 @@ export const OFFICIAL_CACHE_KEY = 'retire:official-cache:v1';
 export const USER_DATA_KEY = 'retire:user-data:v1';
 
 export const fallbackOfficial = {
-  version: 'fallback-0.3.0', inflationRate: 0.025, resourceGrowthRate: 0,
+  version: 'fallback-0.5.0', inflationRate: 0.025, resourceGrowthRate: 0, contributionYears: null,
   stages: [{ id: 'early', label: '60–69 歲', startAge: 60, endAge: 69, ratio: 100 }, { id: 'middle', label: '70–79 歲', startAge: 70, endAge: 79, ratio: 80 }, { id: 'late', label: '80–90 歲', startAge: 80, endAge: 90, ratio: 60 }],
   returnPlans: []
 };
@@ -26,7 +26,8 @@ export function normalizeOfficial(payload) {
     return { planId: String(item.planId ?? item.plan_id ?? ''), sheetName: String(sheetName ?? ''), label: String(item.label ?? item.displayName ?? item.display_name ?? item['前台顯示名稱'] ?? ''), sortOrder: number(item.sortOrder ?? item.sort_order, 9999), enabled: enabledValue === undefined ? true : truthy(enabledValue), rows };
   }).filter((plan) => plan.planId && plan.sheetName && plan.enabled && plan.rows.length).sort((a, b) => a.sortOrder - b.sortOrder);
   const officialData = { ...data };
-  return { ...fallbackOfficial, ...officialData, data: officialData, version: envelope.version ?? data.version ?? envelope.systemVersion ?? data.systemVersion ?? fallbackOfficial.version, inflationRate: number(envelope.inflationRate ?? data.inflationRate ?? envelope.inflation_rate ?? data.inflation_rate, fallbackOfficial.inflationRate), resourceGrowthRate: number(envelope.resourceGrowthRate ?? data.resourceGrowthRate ?? envelope.resource_growth_rate ?? data.resource_growth_rate, fallbackOfficial.resourceGrowthRate), stages: Array.isArray(envelope.stages ?? data.stages) && (envelope.stages ?? data.stages).length ? (envelope.stages ?? data.stages) : fallbackOfficial.stages, returnPlans: plans };
+  const contributionYears = envelope.contributionYears ?? data.contributionYears ?? envelope.contribution_years ?? data.contribution_years ?? envelope['供款年期'] ?? data['供款年期'];
+  return { ...fallbackOfficial, ...officialData, data: officialData, version: envelope.version ?? data.version ?? envelope.systemVersion ?? data.systemVersion ?? fallbackOfficial.version, inflationRate: number(envelope.inflationRate ?? data.inflationRate ?? envelope.inflation_rate ?? data.inflation_rate, fallbackOfficial.inflationRate), resourceGrowthRate: number(envelope.resourceGrowthRate ?? data.resourceGrowthRate ?? envelope.resource_growth_rate ?? data.resource_growth_rate, fallbackOfficial.resourceGrowthRate), contributionYears: Number.isFinite(Number(contributionYears)) && Number(contributionYears) > 0 ? Number(contributionYears) : null, stages: Array.isArray(envelope.stages ?? data.stages) && (envelope.stages ?? data.stages).length ? (envelope.stages ?? data.stages) : fallbackOfficial.stages, returnPlans: plans };
 }
 
 export function readOfficialCache(storage = globalThis.localStorage) { try { return JSON.parse(storage?.getItem(OFFICIAL_CACHE_KEY) || 'null'); } catch { return null; } }

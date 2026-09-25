@@ -23,3 +23,14 @@ test('production Frontstage has persistent Return AVA and no device switcher', (
   assert.match(source, /返回 AVA/);
   assert.doesNotMatch(source, /device|viewport|tablet|mobile/i);
 });
+
+test('production Frontstage connects live inputs to rendered outputs and customer presentation', () => {
+  const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(source, /addEventListener\('input'/);
+  assert.match(source, /data-live="earmarked"/);
+  assert.match(source, /data-saving="annualContribution"/);
+  assert.match(source, /data-saving="contributionYears"/);
+  assert.match(source, /一鍵客戶展示/);
+  assert.match(source, /返回規劃/);
+  assert.doesNotMatch(source, /plan-table|33 年官方資料/);
+});

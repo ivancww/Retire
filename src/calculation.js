@@ -44,9 +44,43 @@ export function purchasingPowerToday(value, inflationRate, years) {
   return amount / (1 + rate) ** period;
 }
 
-export function planProjection({ principal, contributionYears = 1, policyYear, plan }) {
+export function planProjection({ principal, contributionYears = SAVING_PLAN_CONTRIBUTION_YEARS, policyYear, plan, officialContributionYears = SAVING_PLAN_CONTRIBUTION_YEARS }) {
   const row = (plan?.rows || []).find((entry) => Number(entry.policyYear) === Number(policyYear));
   if (!row) return { available: false, message: `官方資料未提供第 ${policyYear} 年，沒有估算或補值。` };
-  const base = Number(principal) * Number(contributionYears);
-  return { available: true, policyYear: Number(policyYear), multiplier: Number(row.multiplier), withdrawalRate: Number(row.withdrawalRate), futureValue: base * Number(row.multiplier) };
+  if (Number(contributionYears) !== Number(officialContributionYears)) return { available: false, message: `官方資料以 ${officialContributionYears} 年供款為基礎；目前供款年期為 ${contributionYears} 年，未作比例推算。` };
+  const base = contributionTotal(principal, contributionYears);
+  const withdrawalRate = Number(row.withdrawalRate);
+  const futureValue = base * Number(row.multiplier);
+  return { available: true, policyYear: Number(policyYear), multiplier: Number(row.multiplier), withdrawalRate, futureValue, totalContribution: base, annualWithdrawal: Number.isFinite(withdrawalRate) ? futureValue * withdrawalRate / 100 : null, basis: 'total_contribution' };
+}
+export const SAVING_PLAN_CONTRIBUTION_YEARS = 5;
+
+export function formatMoney(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? new Intl.NumberFormat('en-HK', { style: 'currency', currency: 'HKD', maximumFractionDigits: 0 }).format(amount) : 'HK$—';
+}
+
+export function formatNumberInput(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? new Intl.NumberFormat('en-HK', { maximumFractionDigits: 2 }).format(amount) : '';
+}
+
+export function parseNumberInput(value) {
+  const cleaned = String(value ?? '').replace(/[$,\s]/g, '');
+  return cleaned === '' ? null : Number(cleaned);
+}
+
+export function contributionTotal(annualContribution, contributionYears) {
+  const annual = Number(annualContribution); const years = Number(contributionYears);
+  return Number.isFinite(annual) && Number.isFinite(years) && annual >= 0 && years >= 0 ? annual * years : 0;
+}
+
+export function earmarkedAmount(resources, mode, value) {
+  const total = Math.max(0, Number(resources) || 0); const input = Math.max(0, Number(value) || 0);
+  return mode === 'percent' ? total * Math.min(100, input) / 100 : input;
+}
+
+export function earmarkedPair(resources, mode, value) {
+  const total = Math.max(0, Number(resources) || 0); const amount = earmarkedAmount(total, mode, value);
+  return { amount, percent: total ? amount / total * 100 : 0 };
 }
