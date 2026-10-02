@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { nextConversationStep, previousConversationStep } from '../src/navigation.js';
+import { APP_VERSION } from '../src/version.js';
 
 test('summary back returns to the last answer without resetting data', () => {
   assert.equal(nextConversationStep(10, 11), 11);
@@ -22,6 +23,13 @@ test('production Frontstage has persistent Return AVA and no device switcher', (
   assert.match(source, /class="return-ava"/);
   assert.match(source, /返回 AVA/);
   assert.doesNotMatch(source, /device|viewport|tablet|mobile/i);
+});
+
+test('production Frontstage uses the canonical app version in its identity', () => {
+  const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.equal(APP_VERSION, '0.6.0');
+  assert.match(source, /brand-version/);
+  assert.match(source, /V\$\{APP_VERSION\}/);
 });
 
 test('production Frontstage connects live inputs to rendered outputs and customer presentation', () => {
