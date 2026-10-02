@@ -1,6 +1,6 @@
 # Retire architecture
 
-Version: `0.5.0`
+Version: `0.6.0`
 
 Retire is an independent repository and deployment. AVA Platform is the source of truth for architecture, navigation, responsive behaviour, PWA boundaries, security, backup/restore and the canonical design language. Retire owns the retirement conversation, calculations, official retirement datasets and domain workflow; it does not copy AVA Platform or 5pay source.
 
