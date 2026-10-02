@@ -22,7 +22,14 @@ test('production Frontstage has persistent Return AVA and no device switcher', (
   const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(source, /class="return-ava"/);
   assert.match(source, /返回 AVA/);
+  assert.doesNotMatch(source, /官方資料已更新|本機資料|離線/);
   assert.doesNotMatch(source, /device|viewport|tablet|mobile/i);
+});
+
+test('Return AVA is a standalone bordered header control', () => {
+  const styles = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /\.return-ava\{[^}]*border:1px solid var\(--ava-color-primary\)/);
+  assert.match(styles, /\.return-ava\{[^}]*border-radius:var\(--ava-radius-control\)/);
 });
 
 test('production Frontstage uses the canonical app version in its identity', () => {
