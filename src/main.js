@@ -88,4 +88,15 @@ app.addEventListener('click', (event) => {
 }, true);
 
 loadOfficialData().then((loaded) => { state.official = loaded.official; state.source = loaded.source; state.stale = loaded.stale; if (state.data.resourceGrowth === null || state.data.resourceGrowth === '') state.data.resourceGrowth = loaded.official.resourceGrowthRate; if (!state.data.resourceCategories) state.data.resourceCategories = {}; syncEarmarkedState(); render(); });
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
+    .then((registration) => registration.update())
+    .catch(() => {});
+}
