@@ -49,3 +49,24 @@ test('production Frontstage connects live inputs to rendered outputs and custome
   assert.match(source, /返回規劃/);
   assert.doesNotMatch(source, /plan-table|33 年官方資料/);
 });
+
+test('customer journey uses the AVA page control and removes duplicate backward actions', () => {
+  const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(source, /function pageControl/);
+  assert.match(source, /class="page-back secondary"/);
+  assert.match(source, /class="page-progress"/);
+  assert.doesNotMatch(source, /上一步|上一題/);
+});
+
+test('journey distinguishes direct choice advance from explicit input advance', () => {
+  const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(source, /const explicitNext = q\.type !== 'choice'/);
+  assert.match(source, /state\.step = nextConversationStep\(state\.step, questions\(\)\.length\)/);
+  assert.match(source, /class="primary next"/);
+});
+
+test('choice cards use responsive available width without a universal fixed card height', () => {
+  const styles = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(styles, /\.choices\{[^}]*grid-template-columns:repeat\(auto-fit/);
+  assert.doesNotMatch(styles, /\.card\{[^}]*height:/);
+});
