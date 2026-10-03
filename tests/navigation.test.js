@@ -61,8 +61,18 @@ test('customer journey uses the AVA page control and removes duplicate backward 
 test('journey distinguishes direct choice advance from explicit input advance', () => {
   const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(source, /const explicitNext = q\.type !== 'choice'/);
+  assert.match(source, /const nextNavigation = explicitNext \? `<div class="step-navigation">/);
+  assert.match(source, /<\/article>\$\{nextNavigation\}\$\{mini\}/);
+  assert.doesNotMatch(source, /explicitNext \? `<div class="actions">/);
   assert.match(source, /state\.step = nextConversationStep\(state\.step, questions\(\)\.length\)/);
   assert.match(source, /class="primary next"/);
+});
+
+test('entry CTA remains in the entry card and ordinary question navigation uses step-navigation', () => {
+  const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  assert.match(source, /class="card hero"[\s\S]*class="primary next"[^>]*>開始傾/);
+  assert.match(source, /class="page-back secondary"/);
+  assert.doesNotMatch(source, /class="secondary back"/);
 });
 
 test('choice cards use responsive available width without a universal fixed card height', () => {
