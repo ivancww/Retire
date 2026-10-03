@@ -6,7 +6,7 @@ import vm from 'node:vm';
 const swSource = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 const mainSource = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 
-function createWorkerHarness() {
+function createWorkerHarness({ fetcher } = {}) {
   const listeners = {};
   const cached = new Map();
   const deleted = [];
@@ -27,6 +27,7 @@ function createWorkerHarness() {
     },
     fetch: async (request, options) => {
       calls.fetch.push({ request, options });
+      if (fetcher) return fetcher(request, options);
       return { ok: true, type: 'basic', clone() { return this; } };
     },
     self: {
@@ -67,6 +68,19 @@ test('Retire shell requests revalidate online and retain a fallback cache', asyn
   await responsePromise;
   assert.equal(harness.calls.fetch[0].options.cache, 'no-store');
   assert.equal(harness.cached.get('https://retire.example/').ok, true);
+});
+
+test('Retire shell requests use the cached document when the network is unavailable', async () => {
+  const harness = createWorkerHarness({ fetcher: async () => { throw new Error('offline'); } });
+  await lifecycle(harness, 'install');
+  let responsePromise;
+  harness.listeners.fetch({
+    request: { method: 'GET', mode: 'navigate', destination: '', url: 'https://retire.example/' },
+    respondWith: (promise) => { responsePromise = promise; },
+    waitUntil: () => {},
+  });
+  const response = await responsePromise;
+  assert.equal(response.source, 'precache');
 });
 
 test('production registration checks for updates and bounds controllerchange reloads', () => {
