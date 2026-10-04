@@ -7,9 +7,10 @@ Retire is an independent repository and deployment. AVA Platform is the source o
 ## Ownership and storage
 
 - Official Layer: `ENDPOINT` returns defaults, content, stages, and the `回報表設定` return-plan registry. A valid response is cached locally as `retire:official-cache:v1`; cache is never a User Override.
-- User Layer: `retire:user-data:v1` stores only the local working inputs and is never sent to GAS. It remains independent from official cache.
+- User Layer: `retire:user-data:v1` stores local working inputs plus the separate `userOverrides` presentation object; neither is sent to GAS. User Overrides remain independent from the Official cache.
 - Current implementation uses local structured storage only. AVA Platform remains the owner of shared backup/restore and common identity services; this app does not create a second User Workspace or backup system.
-- The persistent `返回 AVA` control is present on every Frontstage view, including Summary, Explore and Customer Presentation. The current `../avaplatform/` relative entry is an integration placeholder; deployment integration must replace/configure it with the actual registered AVA Platform destination for the hosting topology. No standalone production URL is invented here.
+- The persistent `返回 AVA` control is present on every Frontstage view, including Summary, Explore and Customer Presentation, and points to the verified AVA Platform deployment at `https://ivancww.github.io/avaplatform/`.
+- `?avaEntry=frontend` and unsupported entries use the normal customer Frontstage. `?avaEntry=user` uses that same Frontstage with a User Edit control for presentation-only local overrides, followed by Preview and Save Local. No Admin capability is implemented.
 
 ## Flow and calculation contract
 
