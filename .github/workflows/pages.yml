@@ -47,7 +47,7 @@ jobs:
           assert manifest['scope'] == './'
           assert manifest['display'] == 'standalone'
           assert 'href="manifest.webmanifest"' in html
-          for asset in ['./styles.css', './src/main.js']:
+          for asset in ['styles.css', 'src/main.js']:
               assert asset in html, asset
           assert "register('./sw.js'" in main
           for asset in ['./index.html', './styles.css', './src/main.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './sw.js']:
