@@ -1,0 +1,84 @@
+name: Deploy Retire to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Retire
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Retire tests
+        run: npm test
+
+      - name: Validate Pages asset contract
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          manifest = json.loads(Path('manifest.webmanifest').read_text())
+          html = Path('index.html').read_text()
+          main = Path('src/main.js').read_text()
+          service_worker = Path('sw.js').read_text()
+
+          assert manifest['start_url'] == './'
+          assert manifest['scope'] == './'
+          assert manifest['display'] == 'standalone'
+          assert 'href="manifest.webmanifest"' in html
+          for asset in ['styles.css', 'src/main.js']:
+              assert asset in html, asset
+          assert "register('./sw.js'" in main
+          for asset in ['./index.html', './styles.css', './design-system/tokens.css', './design-system/components.css', './design-system/frontend.css', './src/main.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './sw.js']:
+              assert asset in service_worker, asset
+          assert not re.search(r'(?:href|src)=["\']/[^/]', html)
+          print('Retire GitHub Pages asset and PWA contract PASS')
+          PY
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out Retire
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
