@@ -5,7 +5,7 @@
 // fallback only.
 const CACHE_NAME = 'retire-shell';
 const OWNED_CACHE_PREFIXES = ['retire-shell', 'retire-v'];
-const APP_SHELL = ['./', './index.html', './styles.css', './design-system/tokens.css', './design-system/components.css', './design-system/frontend.css', './src/main.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './icons/icon-192.svg', './icons/icon-512.svg', './sw.js'];
+const APP_SHELL = ['./', './index.html', './styles.css', './design-system/tokens.css', './design-system/components.css', './design-system/frontend.css', './design-system/management.css', './src/main.js', './src/admin.js', './src/admin-auth.js', './src/admin-contract.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './icons/icon-192.svg', './icons/icon-512.svg', './sw.js'];
 
 const isOwnedShellCache = (name) => OWNED_CACHE_PREFIXES.some((prefix) => name.startsWith(prefix));
 const isShellRequest = (request) => request.mode === 'navigate' || ['script', 'style'].includes(request.destination);

@@ -2,10 +2,13 @@ import { contributionTotal, earmarkedAmount as calculateEarmarkedAmount, earmark
 import { loadOfficialData, readUserData, writeUserData } from './data.js';
 import { nextConversationStep, previousConversationStep } from './navigation.js';
 import { APP_VERSION } from './version.js';
+import { mountAdmin } from './admin.js';
 
 const money = formatMoney;
 const app = document.querySelector('#app');
 const ENTRY_MODE = new URLSearchParams(window.location.search).get('avaEntry');
+if (ENTRY_MODE === 'admin') mountAdmin(app);
+else {
 const USER_ENTRY = ENTRY_MODE === 'user';
 const AVA_PLATFORM_URL = 'https://ivancww.github.io/avaplatform/';
 const saved = readUserData();
@@ -106,4 +109,5 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' })
     .then((registration) => registration.update())
     .catch(() => {});
+}
 }

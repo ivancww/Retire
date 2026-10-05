@@ -52,7 +52,7 @@ jobs:
           for asset in ['styles.css', 'src/main.js']:
               assert asset in html, asset
           assert "register('./sw.js'" in main
-          for asset in ['./index.html', './styles.css', './design-system/tokens.css', './design-system/components.css', './design-system/frontend.css', './src/main.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './sw.js']:
+          for asset in ['./index.html', './styles.css', './design-system/tokens.css', './design-system/components.css', './design-system/frontend.css', './design-system/management.css', './src/main.js', './src/admin.js', './src/admin-auth.js', './src/admin-contract.js', './src/version.js', './src/navigation.js', './src/data.js', './src/calculation.js', './manifest.webmanifest', './sw.js']:
               assert asset in service_worker, asset
           assert not re.search(r'(?:href|src)=["\']/[^/]', html)
           print('Retire GitHub Pages asset and PWA contract PASS')

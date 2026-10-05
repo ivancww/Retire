@@ -1,0 +1,22 @@
+/** AVA Studio/settings composition. Synchronized from Mother Design System. */
+.ava-management { min-height: 100vh; min-height: 100dvh; color: var(--ava-color-text); background: var(--ava-color-background); font-family: var(--ava-font-family); font-size: var(--ava-type-body); line-height: var(--ava-line-body); }
+.ava-management__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--ava-gap-component); padding: var(--ava-space-16) var(--ava-page-padding-inline); padding-left: var(--ava-page-padding-left); padding-right: var(--ava-page-padding-right); padding-top: max(var(--ava-space-16), env(safe-area-inset-top)); color: var(--ava-color-on-primary); background: var(--ava-color-primary); font-weight: var(--ava-weight-extrabold); }
+.ava-management__workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--ava-gap-component); box-sizing: border-box; width: 100%; max-width: var(--ava-content-wide); margin-inline: auto; padding: var(--ava-page-padding-block) var(--ava-page-padding-inline); padding-left: var(--ava-page-padding-left); padding-right: var(--ava-page-padding-right); padding-bottom: max(var(--ava-page-padding-block), env(safe-area-inset-bottom)); }
+.ava-management__sidebar, .ava-management__content { min-width: 0; background: var(--ava-color-surface); border: var(--ava-border-width) solid var(--ava-color-border); border-radius: var(--ava-card-radius); }
+.ava-management__sidebar { display: flex; align-self: start; gap: var(--ava-space-8); padding: var(--ava-space-8); overflow-x: auto; }
+.ava-management__sidebar-button { flex-shrink: 0; min-height: var(--ava-touch-target); padding: var(--ava-space-8) var(--ava-space-12); color: var(--ava-color-text-secondary); text-align: start; font: inherit; background: transparent; border: var(--ava-border-width) solid transparent; border-radius: var(--ava-control-radius); cursor: pointer; }
+.ava-management__sidebar-button[aria-current="page"] { color: var(--ava-color-brand); background: var(--ava-color-selected); font-weight: var(--ava-weight-bold); }
+.ava-management__content { padding: var(--ava-card-padding); }
+.ava-management__card { position: relative; padding: var(--ava-card-padding); margin-bottom: var(--ava-space-16); background: var(--ava-color-surface); border: var(--ava-border-width) solid var(--ava-color-border); border-radius: var(--ava-card-radius); }
+.ava-management__form { display: grid; gap: var(--ava-space-16); }
+.ava-management__actions { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--ava-gap-component); padding-top: var(--ava-space-20); margin-top: var(--ava-space-20); border-top: var(--ava-border-width) solid var(--ava-color-border); }
+.ava-management__status { min-height: 1.6em; margin-top: var(--ava-space-8); color: var(--ava-color-text-secondary); font-size: var(--ava-type-support); }
+.retire-admin-table-wrap { overflow-x: auto; }
+.retire-admin-table { width: 100%; min-width: 680px; border-collapse: collapse; }
+.retire-admin-table th, .retire-admin-table td { padding: var(--ava-space-8); text-align: start; vertical-align: top; border-bottom: var(--ava-border-width) solid var(--ava-color-border); }
+.retire-admin-table th { color: var(--ava-color-text-secondary); font-size: var(--ava-type-caption); }
+.retire-admin-table input { width: 100%; min-width: 96px; }
+.retire-admin-identity { display: grid; gap: var(--ava-space-4); }
+.retire-admin-identity small { color: var(--ava-color-on-primary); opacity: .8; }
+@media (max-width: 650px) { .ava-management__actions { flex-direction: column; align-items: stretch; } }
+@media (min-width: 1001px) { .ava-management__workspace { grid-template-columns: var(--ava-sidebar-width) minmax(0, 1fr); } .ava-management__sidebar { position: sticky; top: var(--ava-space-20); display: grid; max-height: calc(100dvh - var(--ava-space-42)); overflow-y: auto; } }
