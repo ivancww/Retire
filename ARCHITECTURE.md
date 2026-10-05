@@ -17,7 +17,7 @@ The production Pages workflow validates pull requests and development changes wi
 - Presentation User Overrides: `presentationTitle` and `presentationSubtitle` are not fields in the current Retire Official schema (which contains retirement defaults, stages and return-plan data). Official Default precedence is therefore not applicable to these two product presentation fields; their supported fallback is the built-in Retire copy, overridden only by the local User Layer. Official refresh cannot overwrite them, Preview is draft-only, and Save Local writes only `retire:user-data:v1`.
 - Current implementation uses local structured storage only. AVA Platform remains the owner of shared backup/restore and common identity services; this app does not create a second User Workspace or backup system.
 - The persistent `返回 AVA` control is present on every Frontstage view, including Summary, Explore and Customer Presentation, and points to the verified AVA Platform deployment at `https://ivancww.github.io/avaplatform/`.
-- `?avaEntry=frontend` and unsupported entries use the normal customer Frontstage. `?avaEntry=user` uses that same Frontstage with a User Edit control for presentation-only local overrides, followed by Preview and Save Local. No Admin capability is implemented.
+- `?avaEntry=frontend` and unsupported entries use the normal customer Frontstage. `?avaEntry=user` uses that same Frontstage with a User Edit control for presentation-only local overrides, followed by Preview and Save Local. `?avaEntry=admin` is a grant-gated Retire-owned Official management surface; the URL alone never authorizes it.
 
 ## Flow and calculation contract
 
@@ -31,7 +31,11 @@ All gap comparisons use retirement-date values: future lifestyle need versus pro
 
 ## GAS contract
 
-Official endpoint: `https://script.google.com/macros/s/AKfycbyaup9srjMJkdvzgixi4Kjs9lT6RRI2L-CMqJB-QLuQ2u0grArDxq3vI_4hZyr6PiPOAw/exec`. The runtime asks for `?action=bootstrap`; schema normalization tolerates the documented bilingual field names. Actual endpoint response could not be inspected in this environment because DNS/network access was blocked, so production payload validation remains pending.
+Official endpoint: `https://script.google.com/macros/s/AKfycbyaup9srjMJkdvzgixi4Kjs9lT6RRI2L-CMqJB-QLuQ2u0grArDxq3vI_4hZyr6PiPOAw/exec`. The runtime asks for `?action=bootstrap`; schema normalization tolerates the documented bilingual field names. The current live Sheet was audited as `設定`, `頁面設定`, `選項設定`, `退休階段`, `資產類別`, `計算設定`, `回報表設定`, plus registered return-plan tabs. `gas/RetireAdminApi.gs` supplies the Mother-supported Admin helper: `avaAdminLaunch` exchange, server-side `verifyAppGrant`, fixed App-owned schema routes, validation, locking, acknowledgement and re-read. It must be integrated into the deployed Retire GAS handler; the existing live GAS source is not present in this repository, so live protected-write verification remains pending.
+
+## Retire Admin security boundary
+
+Retire adapts the current Mother contract used by Medical. AVA Studio issues the short-lived, one-time `avaAdminLaunch`; the Retire backend exchanges it with Platform and keeps the opaque App grant only in memory in the browser. Each Official read/write is sent to the Retire backend, which verifies the grant server-to-server with App ID `retire` and the requested operation before reading or mutating the bound Retire Sheet. Mutations use explicit allowlisted domains and fields, preserve the dynamic return-plan registry, reject arbitrary sheet/range input, validate the complete payload before a locked replacement, acknowledge success, and re-read Official data. Admin never writes `retire:user-data:v1`.
 
 ## PWA and presentation
 

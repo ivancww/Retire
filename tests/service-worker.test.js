@@ -56,6 +56,7 @@ test('Retire worker installs, activates, claims, and removes only Retire shell c
   assert.deepEqual(harness.deleted, ['retire-v0.6.0']);
   assert.equal(harness.cached.get('./index.html').source, 'precache');
   assert.equal(harness.cached.get('./design-system/tokens.css').source, 'precache');
+  assert.equal(harness.cached.get('./design-system/management.css').source, 'precache');
 });
 
 test('Retire shell requests revalidate online and retain a fallback cache', async () => {

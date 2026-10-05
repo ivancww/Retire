@@ -8,7 +8,7 @@ test('Retire consumes the canonical Mother Design System locally', () => {
   const index = read('index.html');
   const main = read('src/main.js');
   const productCss = read('styles.css');
-  for (const asset of ['design-system/tokens.css', 'design-system/components.css', 'design-system/frontend.css']) assert.match(index, new RegExp(asset.replaceAll('/', '\\/')));
+  for (const asset of ['design-system/tokens.css', 'design-system/components.css', 'design-system/frontend.css', 'design-system/management.css']) assert.match(index, new RegExp(asset.replaceAll('/', '\\/')));
   assert.match(index, /class="app-shell ava-front"/);
   assert.match(main, /ava-front__header/);
   assert.match(main, /ava-front__content/);
