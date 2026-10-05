@@ -1,0 +1,181 @@
+/** AVA Design System — canonical primitives, semantic roles and compatibility aliases. */
+:root {
+  /* Shared brand language */
+  --ava-color-brand: #2563eb;
+  --ava-color-brand-hover: #1d4ed8;
+  --ava-color-brand-soft: #eff6ff;
+  --ava-color-surface: #ffffff;
+  --ava-color-success: #059669;
+  --ava-color-purple: #7c3aed;
+  --ava-color-danger: #dc2626;
+
+  /* Compatibility aliases; all experiences resolve to shared semantic roles. */
+  --ava-shell-background: var(--ava-color-background);
+  --ava-shell-text: var(--ava-color-text);
+  --ava-shell-text-secondary: var(--ava-color-text-secondary);
+  --ava-shell-text-muted: var(--ava-color-text-muted);
+  --ava-shell-border: var(--ava-color-border);
+  --ava-shell-font: var(--ava-font-family);
+  --ava-shell-sidebar-width: var(--ava-sidebar-width);
+  --ava-shell-page-max-width: var(--ava-content-wide);
+  --ava-shell-page-padding: var(--ava-page-padding-block) var(--ava-page-padding-inline);
+
+  /* Frontstage aliases preserve public names, not a separate visual authority. */
+  --ava-front-background: var(--ava-color-background);
+  --ava-front-text: var(--ava-color-text);
+  --ava-front-text-secondary: var(--ava-color-text-secondary);
+  --ava-front-text-muted: var(--ava-color-text-muted);
+  --ava-front-border: var(--ava-color-border);
+  --ava-front-brand-primary: var(--ava-color-primary);
+  --ava-front-font: var(--ava-font-family);
+  --ava-front-page-max-width: var(--ava-content-width);
+  --ava-front-page-margin: clamp(14px, 2.4vw, 28px);
+  --ava-front-page-padding-inline: var(--ava-page-padding-inline);
+
+  /* Type scale found in production. */
+  --ava-font-size-10: 10px;
+  --ava-font-size-11: 11px;
+  --ava-font-size-12: 12px;
+  --ava-font-size-13: 13px;
+  --ava-font-size-14: 14px;
+  --ava-font-size-17: 17px;
+  --ava-font-size-18: 18px;
+  --ava-font-size-21: 21px;
+  --ava-font-size-23: 23px;
+  --ava-font-size-28: 28px;
+  --ava-font-size-32: 32px;
+  --ava-front-question-size: var(--ava-type-page);
+  --ava-front-support-size: var(--ava-type-support);
+  --ava-weight-regular: 400;
+  --ava-weight-medium: 500;
+  --ava-weight-semibold: 600;
+  --ava-weight-bold: 700;
+  --ava-weight-extrabold: 800;
+  --ava-weight-black: 900;
+  --ava-line-tight: 1.2;
+  --ava-line-title: 1.3;
+  --ava-line-copy: 1.55;
+  --ava-line-body: 1.6;
+
+  /* The observed spacing values, named rather than rounded into a new scale. */
+  --ava-space-2: 2px;
+  --ava-space-4: 4px;
+  --ava-space-6: 6px;
+  --ava-space-8: 8px;
+  --ava-space-10: 10px;
+  --ava-space-12: 12px;
+  --ava-space-14: 14px;
+  --ava-space-16: 16px;
+  --ava-space-18: 18px;
+  --ava-space-20: 20px;
+  --ava-space-22: 22px;
+  --ava-space-24: 24px;
+  --ava-space-28: 28px;
+  --ava-space-32: 32px;
+  --ava-space-34: 34px;
+  --ava-space-42: 42px;
+  --ava-space-60: 60px;
+
+  --ava-radius-6: 6px;
+  --ava-radius-8: 8px;
+  --ava-radius-10: 10px;
+  --ava-radius-12: 12px;
+  --ava-radius-14: 14px;
+  --ava-radius-16: 16px;
+  --ava-radius-18: 18px;
+  --ava-radius-20: 20px;
+  --ava-radius-modal-mobile: 22px;
+  --ava-radius-pill: 999px;
+  --ava-shadow-shell: 0 10px 28px rgba(23, 32, 51, 0.08);
+  --ava-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --ava-shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.06);
+  --ava-focus-ring: 0 0 0 var(--ava-focus-width) var(--ava-color-focus);
+
+  --ava-control-height: var(--ava-touch-target);
+  --ava-front-control-min-height: var(--ava-touch-target);
+  --ava-nav-height: 53px;
+  --ava-progress-height: 3px;
+  --ava-motion-fast: 0.2s;
+  --ava-motion-page: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Canonical responsive boundaries. CSS queries use matching literals because
+     custom properties cannot be used in media conditions. */
+  --ava-breakpoint-compact: 650px;
+  --ava-breakpoint-wide: 1000px;
+  --ava-breakpoint-shell-mobile: var(--ava-breakpoint-compact);
+  --ava-breakpoint-front-mobile: var(--ava-breakpoint-compact);
+  --ava-breakpoint-management-mobile: var(--ava-breakpoint-compact);
+  --ava-breakpoint-shell-tablet: var(--ava-breakpoint-wide);
+  --ava-breakpoint-front-tablet: var(--ava-breakpoint-wide);
+
+  /* Shared visual roles. Blue/navy and the AVA shell canvas are retained. */
+  --ava-color-background: #f6f8fb;
+  --ava-color-text: #172033;
+  --ava-color-text-secondary: #475569;
+  --ava-color-text-muted: #64748b;
+  --ava-color-border: #e7ebf1;
+  --ava-color-control-border: #64748b;
+  --ava-color-primary: #1e3a8a;
+  --ava-color-primary-hover: #172f70;
+  --ava-color-on-primary: #ffffff;
+  --ava-color-secondary: var(--ava-color-brand);
+  --ava-color-hover: var(--ava-color-brand-soft);
+  --ava-color-pressed: #dbeafe;
+  --ava-color-selected: var(--ava-color-brand-soft);
+  --ava-color-disabled: #e2e8f0;
+  --ava-color-disabled-text: #475569;
+  --ava-color-success-text: #047857;
+  --ava-color-success-soft: #ecfdf5;
+  --ava-color-warning: #92400e;
+  --ava-color-warning-soft: #fffbeb;
+  --ava-color-error: var(--ava-color-danger);
+  --ava-color-error-soft: #fef2f2;
+  --ava-color-focus: var(--ava-color-brand);
+  --ava-color-overlay: rgba(15, 23, 42, 0.6);
+  --ava-color-track: #e2e8f0;
+  --ava-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang HK", "Noto Sans TC", sans-serif;
+  --ava-type-page: clamp(1.875rem, 1.75rem + 0.5vw, 2rem);
+  --ava-type-section: clamp(1.375rem, 1.25rem + 0.5vw, 1.4375rem);
+  --ava-type-card: 1.0625rem;
+  --ava-type-body: 1rem;
+  --ava-type-support: 0.875rem;
+  --ava-type-caption: 0.75rem;
+  --ava-type-label: 0.875rem;
+  --ava-type-button: 1rem;
+  --ava-type-number: clamp(1.75rem, 1.25rem + 2vw, 2.5rem);
+  --ava-type-presentation-number: clamp(2rem, 1.5rem + 2vw, 3rem);
+  --ava-gap-component: var(--ava-space-12);
+  --ava-gap-section: var(--ava-space-28);
+  --ava-card-padding: var(--ava-space-20);
+  --ava-card-radius: var(--ava-radius-16);
+  --ava-control-radius: var(--ava-radius-10);
+  --ava-page-padding-inline: var(--ava-space-16);
+  --ava-page-padding-block: var(--ava-space-22);
+  --ava-safe-area-left: env(safe-area-inset-left, 0px);
+  --ava-safe-area-right: env(safe-area-inset-right, 0px);
+  --ava-page-padding-left: max(var(--ava-page-padding-inline), var(--ava-safe-area-left));
+  --ava-page-padding-right: max(var(--ava-page-padding-inline), var(--ava-safe-area-right));
+  --ava-content-width: 1080px;
+  --ava-content-wide: 1500px;
+  --ava-sidebar-width: 230px;
+  --ava-touch-target: 44px;
+  --ava-textarea-height: 220px;
+  --ava-icon-size: 20px;
+  --ava-icon-large: 24px;
+  --ava-icon-stroke: 2;
+  --ava-border-width: 1px;
+  --ava-focus-width: 2px;
+  --ava-focus-offset: 2px;
+  --ava-disabled-opacity: 0.65;
+  --ava-modal-width: 460px;
+  --ava-blur: 4px;
+  --ava-z-header: 100;
+  --ava-z-modal: 2000;
+  --ava-bar-height: 12px;
+}
+@media (min-width: 651px) {
+  :root { --ava-page-padding-inline: var(--ava-space-24); --ava-page-padding-block: var(--ava-space-28); }
+}
+@media (min-width: 1001px) {
+  :root { --ava-page-padding-inline: var(--ava-space-42); --ava-page-padding-block: var(--ava-space-34); }
+}
