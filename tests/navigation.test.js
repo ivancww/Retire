@@ -20,7 +20,7 @@ test('forward navigation is bounded at summary', () => {
 
 test('production Frontstage has persistent Return AVA and no device switcher', () => {
   const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-  assert.match(source, /class="return-ava"/);
+  assert.match(source, /class="[^"]*return-ava"/);
   assert.match(source, /返回 AVA/);
   assert.doesNotMatch(source, /官方資料已更新|本機資料|離線/);
   assert.doesNotMatch(source, /device|viewport|tablet|mobile/i);
