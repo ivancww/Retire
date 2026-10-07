@@ -41,7 +41,7 @@ function retireExchangeAppLaunch_(launchTicket, appId) {
   if (!endpoint) throw new Error('Retire Admin authorization is not configured');
   const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'exchangeAppLaunch', launchTicket: String(launchTicket), appId: RETIRE_ADMIN_APP_ID }), muteHttpExceptions: true });
   const payload = retireParseResponse_(response);
-  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || payload.appId !== RETIRE_ADMIN_APP_ID || !payload.appGrant) throw new Error('Invalid or expired AVA Admin launch');
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || !payload.appGrant) throw new Error('Invalid or expired AVA Admin launch');
   return { success: true, appId: RETIRE_ADMIN_APP_ID, appGrant: String(payload.appGrant), expiresAt: payload.expiresAt };
 }
 
