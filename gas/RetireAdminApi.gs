@@ -26,7 +26,7 @@ const RETIRE_ADMIN_SCHEMAS = Object.freeze({
 
 function retireAdminAction_(body) {
   try {
-    if (body.action === 'exchangeAdminSession') return retireExchangeAdminSession_(body.launchTicket, body.appId, body.browserProof, body.launchNonce);
+    if (body.action === 'exchangeAdminSession') return retireExchangeAdminSession_(body.launchTicket, body.appId, body.launchNonce);
     if (body.action === 'readOfficialConfig') { retireVerifyAdminSession_(body.adminSessionProof, 'official-read'); return retireAdminRead_(); }
     const schema = RETIRE_ADMIN_SCHEMAS[body.action];
     if (schema) { retireVerifyAdminSession_(body.adminSessionProof, body.action); return retireAdminWrite_(body.action, body, schema); }
@@ -35,11 +35,11 @@ function retireAdminAction_(body) {
   } catch (error) { return { success: false, error: String(error.message || 'Retire Admin request failed') }; }
 }
 
-function retireExchangeAdminSession_(launchTicket, appId, browserProof, launchNonce) {
+function retireExchangeAdminSession_(launchTicket, appId, launchNonce) {
   if (String(appId || '') !== RETIRE_ADMIN_APP_ID || !String(launchTicket || '')) throw new Error('Invalid Retire Admin launch');
   const endpoint = PropertiesService.getScriptProperties().getProperty('AVA_PLATFORM_ADMIN_AUTH_URL');
   if (!endpoint) throw new Error('Retire Admin authorization is not configured');
-  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'exchangeAdminSession', launchTicket: String(launchTicket), browserProof: String(browserProof || ''), launchNonce: String(launchNonce || ''), appId: RETIRE_ADMIN_APP_ID }), muteHttpExceptions: true });
+  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'exchangeAdminSession', launchTicket: String(launchTicket), launchNonce: String(launchNonce || ''), appId: RETIRE_ADMIN_APP_ID }), muteHttpExceptions: true });
   const payload = retireParseResponse_(response);
   if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || payload.appId !== RETIRE_ADMIN_APP_ID || !payload.adminSessionProof || payload.contract !== 'ava-admin-session-v1') throw new Error('Invalid or expired AVA Admin launch');
   return { success: true, appId: RETIRE_ADMIN_APP_ID, adminSessionProof: String(payload.adminSessionProof), expiresAt: payload.expiresAt, contract: 'ava-admin-session-v1' };
