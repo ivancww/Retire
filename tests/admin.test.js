@@ -14,13 +14,14 @@ test('Admin entry is grant-gated and does not use browser-persistent authorizati
   assert.match(main, /ENTRY_MODE === 'admin'/);
   assert.match(main, /mountAdmin\(app\)/);
   assert.match(auth, /action: 'exchangeAdminSession'/);
-  assert.doesNotMatch(auth, /globalThis\.opener|postMessage|browserProof/);
-  assert.match(auth, /launchNonce/);
+  assert.match(auth, /globalThis\.opener/);
+  assert.match(auth, /event\.origin !== PLATFORM_ORIGIN/);
+  assert.match(auth, /event\.source !== opener/);
+  assert.match(auth, /browserProof/);
   assert.match(auth, /appId: APP_ID/);
   assert.match(auth, /clearLaunchFromUrl\(location\)/);
   assert.doesNotMatch(auth, /localStorage|sessionStorage|indexedDB|password|private.?key/i);
   assert.match(admin, /if \(!hasSession\(\)\)/);
-  assert.match(admin, /AVA_RETURN_URL/);
   assert.match(admin, /acknowledged !== true/);
   assert.match(index, /design-system\/management\.css/);
 });
@@ -40,7 +41,7 @@ test('Retire backend uses Mother grant verification and fixed schema routes', ()
   assert.match(gas, /action: 'verifyAdminSession'/);
   assert.match(gas, /appId: RETIRE_ADMIN_APP_ID/);
   assert.match(gas, /ava-admin-session-v1/);
-  assert.doesNotMatch(gas, /browserProof/);
+  assert.match(gas, /browserProof/);
   assert.match(gas, /RETIRE_ADMIN_SCHEMAS/);
   assert.match(gas, /LockService\.getScriptLock/);
   assert.match(gas, /Return plan is not registered or enabled/);

@@ -7,7 +7,6 @@ const architecture = fs.readFileSync(new URL('../ARCHITECTURE.md', import.meta.u
 assert.match(source, /new URLSearchParams\(window\.location\.search\)\.get\('avaEntry'\)/);
 assert.match(source, /const USER_ENTRY = ENTRY_MODE === 'user'/);
 assert.match(source, /const AVA_PLATFORM_URL = 'https:\/\/ivancww\.github\.io\/avaplatform\/'/);
-assert.match(source, /const AVA_RETURN_URL = `\$\{AVA_PLATFORM_URL\}\$\{ENTRY_MODE === 'admin' \? '\?avaSurface=admin' : ''\}`/);
 assert.match(source, /USER_ENTRY \? `.*user-edit-toggle/s);
 assert.match(source, /function userEditPanel\(\)/);
 assert.match(source, /state\.preview = true/);
