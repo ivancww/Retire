@@ -31,7 +31,7 @@ All gap comparisons use retirement-date values: future lifestyle need versus pro
 
 ## GAS contract
 
-Official endpoint: `https://script.google.com/macros/s/AKfycbyaup9srjMJkdvzgixi4Kjs9lT6RRI2L-CMqJB-QLuQ2u0grArDxq3vI_4hZyr6PiPOAw/exec`. The runtime asks for `?action=bootstrap`; schema normalization tolerates the documented bilingual field names. The current live Sheet was audited as `設定`, `頁面設定`, `選項設定`, `退休階段`, `資產類別`, `計算設定`, `回報表設定`, plus registered return-plan tabs. `gas/RetireAdminApi.gs` supplies the Mother-supported Admin helper: `avaAdminLaunch` exchange, server-side `verifyAppGrant`, fixed App-owned schema routes, validation, locking, acknowledgement and re-read. It must be integrated into the deployed Retire GAS handler; the existing live GAS source is not present in this repository, so live protected-write verification remains pending.
+Official endpoint: `https://script.google.com/macros/s/AKfycbyaup9srjMJkdvzgixi4Kjs9lT6RRI2L-CMqJB-QLuQ2u0grArDxq3vI_4hZyr6PiPOAw/exec`. The runtime asks for `?action=bootstrap`; schema normalization tolerates the documented bilingual field names. The current live Sheet was audited as `設定`, `頁面設定`, `選項設定`, `退休階段`, `資產類別`, `計算設定`, `回報表設定`, plus registered return-plan tabs. `gas/RetireAdminApi.gs` uses the same Mother `ava-admin-session-v1` exchange after the shared AVA Studio opener/postMessage browser binding and server-side `verifyAdminSession`, fixed App-owned schema routes, validation, locking, acknowledgement and re-read. It must be integrated into the deployed Retire GAS handler; the existing live GAS source is not present in this repository, so live protected-write verification remains pending.
 
 ## Retire Admin security boundary
 

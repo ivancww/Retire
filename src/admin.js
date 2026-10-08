@@ -1,5 +1,5 @@
 import { APP_VERSION } from './version.js';
-import { clear, exchangeAppLaunch, hasGrant, request } from './admin-auth.js';
+import { clear, exchangeAdminSession, hasSession, request } from './admin-auth.js';
 import { DOMAIN_LABELS, operationFor, validateRows } from './admin-contract.js';
 
 const AVA_PLATFORM_URL = 'https://ivancww.github.io/avaplatform/';
@@ -32,7 +32,7 @@ function mountAdmin(app) {
     app.querySelector('#admin-plan')?.addEventListener('change', (event) => { state.selectedPlan = event.target.value; render(); });
     app.querySelector('#admin-save')?.addEventListener('click', () => saveCurrent());
   };
-  const load = async () => { try { await exchangeAppLaunch(); if (!hasGrant()) throw new Error('Admin authorization is required'); const payload = await request('readOfficialConfig'); state.official = payload.official; state.selectedPlan = selectedPlanId(state.official); state.status = 'Official 已讀取；未保存草稿。'; render(); } catch (error) { clear(); state.status = error.message || '此管理入口需要由 AVA Studio 驗證後開啟。'; render(); } };
+  const load = async () => { try { await exchangeAdminSession(); if (!hasSession()) throw new Error('Admin authorization is required'); const payload = await request('readOfficialConfig'); state.official = payload.official; state.selectedPlan = selectedPlanId(state.official); state.status = 'Official 已讀取；未保存草稿。'; render(); } catch (error) { clear(); state.status = error.message || '此管理入口需要由 AVA Studio 驗證後開啟。'; render(); } };
   const saveCurrent = async () => {
     if (state.busy) return; state.busy = true; const button = app.querySelector('#admin-save'); if (button) button.disabled = true; const status = app.querySelector('#admin-status'); if (status) status.textContent = '正在驗證、保存並重新讀取…';
     try {
