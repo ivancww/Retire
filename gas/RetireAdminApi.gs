@@ -26,31 +26,31 @@ const RETIRE_ADMIN_SCHEMAS = Object.freeze({
 
 function retireAdminAction_(body) {
   try {
-    if (body.action === 'exchangeAppLaunch') return retireExchangeAppLaunch_(body.launchTicket, body.appId);
-    if (body.action === 'readOfficialConfig') { retireVerifyGrant_(body.appGrant, 'official-read'); return retireAdminRead_(); }
+    if (body.action === 'exchangeAdminSession') return retireExchangeAdminSession_(body.launchTicket, body.appId, body.browserProof, body.launchNonce);
+    if (body.action === 'readOfficialConfig') { retireVerifyAdminSession_(body.adminSessionProof, 'official-read'); return retireAdminRead_(); }
     const schema = RETIRE_ADMIN_SCHEMAS[body.action];
-    if (schema) { retireVerifyGrant_(body.appGrant, body.action); return retireAdminWrite_(body.action, body, schema); }
-    if (body.action === 'updateReturnPlanRows') { retireVerifyGrant_(body.appGrant, body.action); return retireReturnRowsWrite_(body); }
+    if (schema) { retireVerifyAdminSession_(body.adminSessionProof, body.action); return retireAdminWrite_(body.action, body, schema); }
+    if (body.action === 'updateReturnPlanRows') { retireVerifyAdminSession_(body.adminSessionProof, body.action); return retireReturnRowsWrite_(body); }
     throw new Error('Unsupported Retire Admin action');
   } catch (error) { return { success: false, error: String(error.message || 'Retire Admin request failed') }; }
 }
 
-function retireExchangeAppLaunch_(launchTicket, appId) {
+function retireExchangeAdminSession_(launchTicket, appId, browserProof, launchNonce) {
   if (String(appId || '') !== RETIRE_ADMIN_APP_ID || !String(launchTicket || '')) throw new Error('Invalid Retire Admin launch');
   const endpoint = PropertiesService.getScriptProperties().getProperty('AVA_PLATFORM_ADMIN_AUTH_URL');
   if (!endpoint) throw new Error('Retire Admin authorization is not configured');
-  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'exchangeAppLaunch', launchTicket: String(launchTicket), appId: RETIRE_ADMIN_APP_ID }), muteHttpExceptions: true });
+  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'exchangeAdminSession', launchTicket: String(launchTicket), browserProof: String(browserProof || ''), launchNonce: String(launchNonce || ''), appId: RETIRE_ADMIN_APP_ID }), muteHttpExceptions: true });
   const payload = retireParseResponse_(response);
-  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || !payload.appGrant) throw new Error('Invalid or expired AVA Admin launch');
-  return { success: true, appId: RETIRE_ADMIN_APP_ID, appGrant: String(payload.appGrant), expiresAt: payload.expiresAt };
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || payload.appId !== RETIRE_ADMIN_APP_ID || !payload.adminSessionProof || payload.contract !== 'ava-admin-session-v1') throw new Error('Invalid or expired AVA Admin launch');
+  return { success: true, appId: RETIRE_ADMIN_APP_ID, adminSessionProof: String(payload.adminSessionProof), expiresAt: payload.expiresAt, contract: 'ava-admin-session-v1' };
 }
 
-function retireVerifyGrant_(appGrant, operation) {
+function retireVerifyAdminSession_(adminSessionProof, operation) {
   const endpoint = PropertiesService.getScriptProperties().getProperty('AVA_PLATFORM_ADMIN_AUTH_URL');
-  if (!endpoint || !String(appGrant || '')) throw new Error('Retire Admin authorization is required');
-  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'verifyAppGrant', appGrant: String(appGrant), appId: RETIRE_ADMIN_APP_ID, operation: String(operation || 'official-write') }), muteHttpExceptions: true });
+  if (!endpoint || !String(adminSessionProof || '')) throw new Error('Retire Admin authorization is required');
+  const response = UrlFetchApp.fetch(endpoint, { method: 'post', contentType: 'text/plain;charset=utf-8', payload: JSON.stringify({ action: 'verifyAdminSession', adminSessionProof: String(adminSessionProof), appId: RETIRE_ADMIN_APP_ID, operation: String(operation || 'official-write') }), muteHttpExceptions: true });
   const payload = retireParseResponse_(response);
-  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || payload.appId !== RETIRE_ADMIN_APP_ID || (payload.expiresAt && new Date(payload.expiresAt).getTime() <= Date.now())) throw new Error('Invalid or expired Retire Admin authorization');
+  if (response.getResponseCode() < 200 || response.getResponseCode() >= 300 || payload.success !== true || payload.appId !== RETIRE_ADMIN_APP_ID || payload.contract !== 'ava-admin-session-v1' || (payload.expiresAt && new Date(payload.expiresAt).getTime() <= Date.now())) throw new Error('Invalid or expired Retire Admin authorization');
   return payload;
 }
 
