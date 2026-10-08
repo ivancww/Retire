@@ -22,6 +22,7 @@ test('Admin entry is grant-gated and does not use browser-persistent authorizati
   assert.match(auth, /clearLaunchFromUrl\(location\)/);
   assert.doesNotMatch(auth, /localStorage|sessionStorage|indexedDB|password|private.?key/i);
   assert.match(admin, /if \(!hasSession\(\)\)/);
+  assert.match(admin, /AVA_RETURN_URL/);
   assert.match(admin, /acknowledged !== true/);
   assert.match(index, /design-system\/management\.css/);
 });
