@@ -1,10 +1,10 @@
 /**
  * AVA Retire complete GAS candidate.
  *
- * CANDIDATE — PRODUCTION IDENTITY UNVERIFIED.
- * Reconciled from the observed Retire 2.0.0 GET contract, verified sheet
- * headers, and the repository Admin contract. Compare with the deployment
- * owner's complete Apps Script project before any deployment.
+ * CANDIDATE — NOT DEPLOYED.
+ * Reconciled against deployed Retire version 8, verified Sheet headers, and
+ * the repository Admin contract. Preserve the legacy GET envelope exactly;
+ * compare this candidate with the deployment owner's source before release.
  *
  * This file is intentionally self-contained: exactly one doGet and one
  * doPost are defined. Return-plan rows are read-only. The bound spreadsheet
@@ -33,22 +33,18 @@ const RETIRE_READ_ONLY_FIELDS = Object.freeze({
 
 function doGet(e) {
   try {
-    const action = String((e && e.parameter && e.parameter.action) || 'health');
-    if (action === 'health') return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION });
-    if (action === 'bootstrap') return retireJson_(retireGetPayload_());
+    const action = String((e && e.parameter && e.parameter.action) || 'bootstrap').trim();
+    if (action === 'health') return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, timestamp: new Date().toISOString() });
+    if (action === 'bootstrap') return retireLegacyBootstrap_();
     if (action === 'returnPlans') {
-      const payload = retireGetPayload_();
-      return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, returnPlans: payload.returnPlans, returnTables: payload.returnTables });
+      return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, generatedAt: new Date().toISOString(), returnPlans: retireLegacyLoadReturnPlans_() });
     }
     if (action === 'sheet') {
       const parameter = (e && e.parameter) || {};
-      const requested = String(parameter.sheetName || parameter.sheet || parameter.name || '');
-      if (!requested) throw new Error('Sheet name is required');
-      const allowed = Object.keys(RETIRE_SHEETS).map(key => RETIRE_SHEETS[key]);
-      if (!allowed.includes(requested)) throw new Error('Sheet is not available');
-      const sheet = retireSheet_(requested);
-      const values = sheet.getDataRange().getValues();
-      return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, sheetName: requested, headers: (values.shift() || []).map(String), rows: values });
+      const requested = String(parameter.name || '').trim();
+      if (!requested) throw new Error('Missing sheet name');
+      if (!retireLegacyIsAllowedSheet_(requested)) throw new Error('Sheet not allowed: ' + requested);
+      return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, sheet: requested, rows: retireLegacyReadSheetObjects_(requested) });
     }
     throw new Error('Unsupported Retire GET action');
   } catch (error) {
@@ -69,6 +65,68 @@ function doPost(e) {
 function retireJson_(value) {
   return ContentService.createTextOutput(JSON.stringify(value)).setMimeType(ContentService.MimeType.JSON);
 }
+
+function retireLegacyBootstrap_() {
+  const data = {};
+  ['設定', '頁面設定', '選項設定', '退休階段', '資產類別', '計算設定', '回報表設定'].forEach(sheetName => { data[sheetName] = retireLegacyReadSheetObjects_(sheetName); });
+  return retireJson_({ ok: true, app: 'Retire', apiVersion: RETIRE_API_VERSION, generatedAt: new Date().toISOString(), data: data, returnPlans: retireLegacyLoadReturnPlans_() });
+}
+
+function retireLegacyLoadReturnPlans_() {
+  const plans = retireLegacyReadSheetObjects_('回報表設定').filter(row => retireLegacyIsEnabled_(row['啟用'])).map(row => ({
+    planId: String(row['plan_id'] || '').trim(), sheetName: String(row['分頁名稱'] || '').trim(),
+    displayName: String(row['前台顯示名稱'] || row['分頁名稱'] || '').trim(), sortOrder: retireLegacyToNumber_(row['排序'], 9999)
+  })).filter(plan => plan.planId && plan.sheetName);
+  const ids = {}, sheets = {};
+  plans.forEach(plan => { if (ids[plan.planId]) throw new Error('Duplicate return plan ID: ' + plan.planId); if (sheets[plan.sheetName]) throw new Error('Duplicate return-plan sheet: ' + plan.sheetName); ids[plan.planId] = true; sheets[plan.sheetName] = true; });
+  plans.sort((a, b) => a.sortOrder - b.sortOrder);
+  return plans.map(plan => ({ planId: plan.planId, sheetName: plan.sheetName, displayName: plan.displayName, sortOrder: plan.sortOrder, rows: retireLegacyReadReturnTable_(plan.sheetName) }));
+}
+
+function retireLegacyReadReturnTable_(sheetName) {
+  const values = retireSheet_(sheetName).getDataRange().getValues();
+  if (!values || values.length < 2) return [];
+  const headers = values[0].map(value => String(value).trim());
+  const yearIndex = headers.indexOf('保單年度'), rateIndex = headers.indexOf('領取百分比'), multiplierIndex = headers.indexOf('倍數');
+  if (yearIndex < 0 || rateIndex < 0 || multiplierIndex < 0) throw new Error('回報分頁「' + sheetName + '」必須包含：保單年度、領取百分比、倍數');
+  const rows = [];
+  for (let i = 1; i < values.length; i += 1) {
+    const row = values[i], year = retireLegacyToNumber_(row[yearIndex], null), withdrawalRate = retireLegacyNormalizePercentage_(row[rateIndex]), multiplier = retireLegacyToNumber_(row[multiplierIndex], null);
+    if (year === null && withdrawalRate === null && multiplier === null) continue;
+    if (year === null || withdrawalRate === null || multiplier === null) throw new Error('回報分頁「' + sheetName + '」第 ' + (i + 1) + ' 行資料無效');
+    rows.push({ policyYear: year, withdrawalRate: withdrawalRate, withdrawalPercent: withdrawalRate * 100, multiplier: multiplier });
+  }
+  return rows.sort((a, b) => a.policyYear - b.policyYear);
+}
+
+function retireLegacyReadSheetObjects_(sheetName) {
+  const values = retireSheet_(sheetName).getDataRange().getValues();
+  if (!values || !values.length) return [];
+  const headers = values[0].map(value => String(value).trim()), rows = [];
+  for (let r = 1; r < values.length; r += 1) {
+    if (values[r].every(value => value === '' || value === null)) continue;
+    const object = {};
+    headers.forEach((header, c) => { if (header) object[header] = values[r][c] instanceof Date ? values[r][c].toISOString() : values[r][c]; });
+    rows.push(object);
+  }
+  return rows;
+}
+
+function retireLegacyIsAllowedSheet_(sheetName) {
+  if (['設定', '頁面設定', '選項設定', '退休階段', '資產類別', '計算設定', '回報表設定'].includes(sheetName)) return true;
+  return retireLegacyReadSheetObjects_('回報表設定').some(row => retireLegacyIsEnabled_(row['啟用']) && String(row['分頁名稱'] || '').trim() === sheetName);
+}
+function retireLegacyIsEnabled_(value) { return value === true || String(value).toLowerCase() === 'true' || value === 1; }
+function retireLegacyNormalizePercentage_(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  if (typeof value === 'number') return value;
+  const text = String(value).trim();
+  if (!text) return null;
+  if (text.endsWith('%')) { const number = Number(text.slice(0, -1)); return Number.isFinite(number) ? number / 100 : null; }
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+function retireLegacyToNumber_(value, fallback) { if (value === '' || value === null || value === undefined) return fallback; const number = Number(value); return Number.isFinite(number) ? number : fallback; }
 
 function retireAdminAction_(body) {
   try {
