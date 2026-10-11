@@ -30,7 +30,7 @@ function retireAdminAction_(body) {
     if (body.action === 'readOfficialConfig') { retireVerifyAdminSession_(body.adminSessionProof, 'official-read'); return retireAdminRead_(); }
     const schema = RETIRE_ADMIN_SCHEMAS[body.action];
     if (schema) { retireVerifyAdminSession_(body.adminSessionProof, body.action); return retireAdminWrite_(body.action, body, schema); }
-    if (body.action === 'updateReturnPlanRows') { retireVerifyAdminSession_(body.adminSessionProof, body.action); return retireReturnRowsWrite_(body); }
+    if (body.action === 'updateReturnPlanRows') throw new Error('Return-plan data is read-only');
     throw new Error('Unsupported Retire Admin action');
   } catch (error) { return { success: false, error: String(error.message || 'Retire Admin request failed') }; }
 }
@@ -54,26 +54,20 @@ function retireVerifyAdminSession_(adminSessionProof, operation) {
   return payload;
 }
 
-function retireAdminRead_() { const official = retireOfficialPayload_(); return { success: true, appId: RETIRE_ADMIN_APP_ID, official: retireAdminConfig_(official) }; }
-function retireAdminWrite_(operation, body, schema) { return retireReplaceDomain_(schema, body.rows); }
+function retireAdminRead_() { const official = retireOfficialPayload_(); return { success: true, appId: RETIRE_ADMIN_APP_ID, official: retireAdminConfig_(official), revision: retireRevision_(official) }; }
+function retireAdminWrite_(operation, body, schema) { return retireReplaceDomain_(schema, body.rows, body.expectedRevision); }
 
 function retireReturnRowsWrite_(body) {
-  const planId = String(body.planId || ''), registry = retireRows_(retireSheet_(RETIRE_ADMIN_SHEETS.returnRegistry));
-  const plan = registry.find(row => String(row.plan_id) === planId && retireBool_(row['啟用']));
-  if (!plan) throw new Error('Return plan is not registered or enabled');
-  const sheetName = String(plan['分頁名稱'] || ''), sheet = retireAllowedPlanSheet_(sheetName), rows = Array.isArray(body.rows) ? body.rows : [];
-  if (!rows.length) throw new Error('Return-plan rows are required');
-  const normalized = rows.map(row => { if (!row || !Number.isInteger(Number(row.policyYear)) || Number(row.policyYear) <= 0 || !Number.isFinite(Number(row.withdrawalRate)) || !Number.isFinite(Number(row.multiplier))) throw new Error('Invalid return-plan row'); return [Number(row.policyYear), Number(row.withdrawalRate), Number(row.multiplier)]; });
-  const existing = retireRows_(sheet); if (existing.length !== normalized.length) throw new Error('Return-plan row count cannot change');
-  const lock = LockService.getScriptLock(); lock.waitLock(10000); try { sheet.getRange(2, 1, sheet.getMaxRows() - 1, 3).clearContent(); sheet.getRange(2, 1, normalized.length, 3).setValues(normalized); } finally { lock.releaseLock(); }
-  return { success: true, appId: RETIRE_ADMIN_APP_ID, acknowledged: true, operation: 'updateReturnPlanRows', planId: planId, official: retireAdminConfig_(retireOfficialPayload_()) };
+  throw new Error('Return-plan data is read-only');
 }
 
-function retireReplaceDomain_(schema, rows) {
+function retireReplaceDomain_(schema, rows, expectedRevision) {
   if (!Array.isArray(rows) || !rows.length) throw new Error('Official rows are required');
+  const before = retireOfficialPayload_();
+  if (!expectedRevision || String(expectedRevision) !== retireRevision_(before)) throw new Error('Official revision conflict; reload before saving');
   const sheet = retireSheet_(RETIRE_ADMIN_SHEETS[schema.domain]), existing = retireRows_(sheet), allowedIds = existing.map(row => String(row[schema.id]));
   if (rows.length !== existing.length) throw new Error('Official row count cannot change');
-  const normalized = rows.map(row => retireNormalizeRow_(schema, row));
+  const normalized = rows.map((row, index) => retireNormalizeRow_(schema, row, existing[index]));
   const ids = normalized.map(row => String(row[schema.id]));
   if (new Set(ids).size !== ids.length || ids.some(id => !allowedIds.includes(id))) throw new Error('Official identifiers cannot change');
   if (schema.domain === 'returnRegistry') {
@@ -81,16 +75,28 @@ function retireReplaceDomain_(schema, rows) {
     const requestedSheets = normalized.map(row => String(row['分頁名稱']));
     if (new Set(requestedSheets).size !== requestedSheets.length || requestedSheets.some(name => !existingSheets.includes(name))) throw new Error('Return-plan registry may only reference existing registered sheets');
   }
-  const values = normalized.map(row => schema.fields.map(field => row[field]));
-  const lock = LockService.getScriptLock(); lock.waitLock(10000); try { sheet.getRange(2, 1, sheet.getMaxRows() - 1, schema.fields.length).clearContent(); sheet.getRange(2, 1, values.length, schema.fields.length).setValues(values); } finally { lock.releaseLock(); }
-  return { success: true, appId: RETIRE_ADMIN_APP_ID, acknowledged: true, operation: Object.keys(RETIRE_ADMIN_SCHEMAS).find(key => RETIRE_ADMIN_SCHEMAS[key] === schema), official: retireAdminConfig_(retireOfficialPayload_()) };
+  const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let snapshot = null;
+  try {
+    const lockedBefore = retireOfficialPayload_();
+    if (String(expectedRevision) !== retireRevision_(lockedBefore)) throw new Error('Official revision conflict; reload before saving');
+    snapshot = sheet.getDataRange().getValues();
+    retireWriteSchemaRows_(sheet, schema, normalized);
+    const after = retireOfficialPayload_();
+    const afterRevision = retireRevision_(after);
+    return { success: true, appId: RETIRE_ADMIN_APP_ID, acknowledged: true, persisted: true, readAfterWrite: true, revision: afterRevision, operation: Object.keys(RETIRE_ADMIN_SCHEMAS).find(key => RETIRE_ADMIN_SCHEMAS[key] === schema), official: retireAdminConfig_(after) };
+  } catch (error) {
+    if (snapshot) retireRestoreSheet_(sheet, snapshot);
+    throw error;
+  } finally { lock.releaseLock(); }
 }
 
-function retireNormalizeRow_(schema, input) {
+function retireNormalizeRow_(schema, input, existing) {
   if (!input || typeof input !== 'object') throw new Error('Invalid Official row');
   const extra = Object.keys(input).filter(key => !schema.fields.includes(key)); if (extra.length) throw new Error('Unsupported Official field');
   const row = {}; schema.fields.forEach(field => { if (input[field] === undefined || input[field] === null) throw new Error(`Missing Official field: ${field}`); row[field] = retireCoerce_(field, input[field]); });
   if (!String(row[schema.id]).trim()) throw new Error('Official identifier is required');
+  retireAssertProtectedFields_(schema.domain, row, existing);
   if (schema.domain === 'settings') {
     if (!['text', 'number', 'boolean'].includes(row.type)) throw new Error('Unsupported setting type');
     if (row.type === 'number') { if (!Number.isFinite(Number(input.value))) throw new Error('Invalid setting number'); row.value = Number(input.value); }
@@ -100,6 +106,30 @@ function retireNormalizeRow_(schema, input) {
   if (schema.domain === 'assets' && !Number.isFinite(row.default_growth_rate)) throw new Error('Invalid asset growth rate');
   return row;
 }
+
+const RETIRE_ADMIN_READ_ONLY_FIELDS = Object.freeze({
+  settings: ['key', 'type'],
+  pages: ['page_id', 'page_type', 'protected'],
+  options: ['group_id', 'option_id', 'value'],
+  stages: ['stage_id'], assets: ['asset_id'], calculations: ['calculation_id'],
+  returnRegistry: ['plan_id', '分頁名稱']
+});
+
+function retireAssertProtectedFields_(domain, row, existing) {
+  (RETIRE_ADMIN_READ_ONLY_FIELDS[domain] || []).forEach(field => {
+    if (existing && String(row[field]) !== String(existing[field])) throw new Error(`Protected Official field cannot change: ${field}`);
+  });
+}
+
+function retireWriteSchemaRows_(sheet, schema, rows) {
+  const range = sheet.getDataRange(); const values = range.getValues(); const headers = values[0].map(String);
+  const columns = schema.fields.map(field => { const index = headers.indexOf(field); if (index < 0) throw new Error(`Configured Official header is unavailable: ${field}`); return index; });
+  if (values.length - 1 !== rows.length) throw new Error('Official row count cannot change');
+  rows.forEach((row, rowIndex) => columns.forEach((columnIndex, fieldIndex) => { values[rowIndex + 1][columnIndex] = row[schema.fields[fieldIndex]]; }));
+  range.setValues(values);
+}
+
+function retireRestoreSheet_(sheet, snapshot) { const range = sheet.getDataRange(); if (range.getNumRows() !== snapshot.length || range.getNumColumns() !== snapshot[0].length) throw new Error('Rollback shape mismatch'); range.setValues(snapshot); }
 
 function retireCoerce_(field, value) {
   if (['sort_order', '排序', 'start_age', 'end_age', 'spending_percent', 'default_growth_rate'].includes(field)) { const number = Number(value); if (!Number.isFinite(number)) throw new Error(`Invalid number: ${field}`); return number; }
@@ -112,6 +142,7 @@ function retireSheet_(name) { const sheet = SpreadsheetApp.getActive().getSheetB
 function retireRows_(sheet) { const values = sheet.getDataRange().getValues(); const headers = values.shift().map(String); return values.filter(row => row.some(value => value !== '' && value !== null)).map(row => Object.fromEntries(headers.map((key, index) => [key, row[index]]))); }
 function retireBool_(value) { return value === true || String(value).toLowerCase() === 'true' || value === 1; }
 function retireParseResponse_(response) { let payload; try { payload = JSON.parse(response.getContentText() || '{}'); } catch (_) { throw new Error('Invalid AVA Admin response'); } return payload; }
+function retireRevision_(payload) { const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, JSON.stringify(payload), Utilities.Charset.UTF_8); return digest.map(byte => (`0${(byte < 0 ? byte + 256 : byte).toString(16)}`).slice(-2)).join(''); }
 function retireOfficialPayload_() {
   const domains = {}; Object.keys(RETIRE_ADMIN_SHEETS).forEach(key => { domains[key] = retireRows_(retireSheet_(RETIRE_ADMIN_SHEETS[key])); });
   const returnTables = {}; domains.returnRegistry.forEach(plan => { const sheet = retireAllowedPlanSheet_(String(plan['分頁名稱'])); returnTables[String(plan.plan_id)] = retireRows_(sheet).map(row => ({ policyYear: Number(row['保單年度']), withdrawalRate: Number(row['領取百分比']), multiplier: Number(row['倍數']) })); });
