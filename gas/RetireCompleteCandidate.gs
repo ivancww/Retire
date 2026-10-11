@@ -31,6 +31,10 @@ const RETIRE_READ_ONLY_FIELDS = Object.freeze({
   calculations: ['calculation_id'], returnRegistry: ['plan_id', '分頁名稱']
 });
 
+function retireEditableFields_(schema) {
+  return schema.fields.filter(field => !(RETIRE_READ_ONLY_FIELDS[schema.domain] || []).includes(field));
+}
+
 function doGet(e) {
   try {
     const action = String((e && e.parameter && e.parameter.action) || 'bootstrap').trim();
@@ -137,7 +141,7 @@ function retireAdminAction_(body) {
     if (body.action === 'updateReturnPlanRows') throw new Error('Return-plan data is read-only');
     throw new Error('Unsupported Retire Admin action');
   } catch (error) {
-    return { success: false, error: String(error.message || 'Retire Admin request failed') };
+    return retireFailure_(null, error, null);
   }
 }
 
@@ -189,16 +193,37 @@ function retireReplaceDomain_(operation, schema, rows, expectedRevision) {
   try {
     const lockedBefore = retireOfficialPayload_();
     if (String(expectedRevision) !== retireRevision_(lockedBefore)) throw new Error('Official revision conflict; reload before saving');
-    snapshot = retireSnapshot_(sheet, schema, normalized.length);
+    snapshot = retireSnapshot_(sheet, schema);
     retireWrite_(sheet, schema, normalized);
+    SpreadsheetApp.flush();
     const after = retireOfficialPayload_();
-    return { success: true, appId: RETIRE_APP_ID, acknowledged: true, persisted: true, readAfterWrite: true, revision: retireRevision_(after), operation: operation, official: retireAdminConfig_(after), evidence: { serverReadAfterWrite: true, persistedDomains: [schema.domain], protectedReturnTables: true } };
+    retireVerifyPersistence_(sheet, schema, snapshot, lockedBefore, normalized, after);
+    const revision = retireRevision_(after);
+    return { success: true, appId: RETIRE_APP_ID, acknowledged: true, persisted: true, readAfterWrite: true, revision: revision, operation: operation, official: retireAdminConfig_(after), evidence: { serverReadAfterWrite: true, persistedDomains: [schema.domain], verifiedFields: schema.fields, protectedReturnTables: true, revision: revision } };
   } catch (error) {
-    if (snapshot) retireRestore_(sheet, snapshot);
-    throw error;
+    if (!snapshot) throw error;
+    try {
+      retireRestore_(sheet, snapshot);
+      SpreadsheetApp.flush();
+      const rollback = retireVerifyRollback_(sheet, snapshot, before, retireRevision_(before));
+      return retireFailure_(operation, error, rollback);
+    } catch (rollbackError) {
+      return retireFailure_(operation, retireError_('ROLLBACK_FAILED', 'Official write failed and rollback could not be verified'), { attempted: true, verified: false, error: String(rollbackError.message || rollbackError), sourceError: String(error.message || error) });
+    }
   } finally {
     lock.releaseLock();
   }
+}
+
+function retireError_(code, message) {
+  const error = new Error(message);
+  error.code = code;
+  return error;
+}
+
+function retireFailure_(operation, error, rollback) {
+  const failureCode = rollback && rollback.verified === false ? 'ROLLBACK_FAILED' : (rollback && rollback.verified === true ? 'WRITE_ROLLED_BACK' : (error && error.code) || 'ADMIN_REQUEST_FAILED');
+  return { success: false, appId: RETIRE_APP_ID, acknowledged: false, persisted: false, readAfterWrite: false, operation: operation || undefined, failureCode: failureCode, error: String(error && error.message || 'Retire Admin request failed'), rollback: rollback || { attempted: false, verified: false }, evidence: { serverReadAfterWrite: false, persisted: false, rollbackVerified: Boolean(rollback && rollback.verified === true) } };
 }
 
 function retireNormalizeRow_(schema, input, existing) {
@@ -232,23 +257,152 @@ function retireCoerce_(field, value) {
 
 function retireWrite_(sheet, schema, rows) {
   const headers = retireHeaders_(sheet);
-  schema.fields.forEach(field => {
+  retireEditableFields_(schema).forEach(field => {
     const index = headers.indexOf(field);
     if (index < 0) throw new Error('Configured Official header is unavailable: ' + field);
     sheet.getRange(2, index + 1, rows.length, 1).setValues(rows.map(row => [row[field]]));
   });
 }
 
-function retireSnapshot_(sheet, schema, rowCount) {
-  const headers = retireHeaders_(sheet);
-  return schema.fields.map(field => {
-    const index = headers.indexOf(field);
-    if (index < 0) throw new Error('Configured Official header is unavailable: ' + field);
-    return { column: index + 1, values: sheet.getRange(2, index + 1, rowCount, 1).getValues() };
-  });
+function retireCapture_(sheet) {
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  return { headers: values[0].map(String), values: values, formulas: range.getFormulas(), numberFormats: range.getNumberFormats() };
 }
 
-function retireRestore_(sheet, snapshot) { snapshot.forEach(entry => sheet.getRange(2, entry.column, entry.values.length, 1).setValues(entry.values)); }
+function retireSnapshot_(sheet, schema) {
+  const snapshot = retireCapture_(sheet);
+  schema.fields.forEach(field => { if (snapshot.headers.indexOf(field) < 0) throw new Error('Configured Official header is unavailable: ' + field); });
+  return snapshot;
+}
+
+function retireCaptureRecords_(capture, schema) {
+  const records = {};
+  for (let rowIndex = 1; rowIndex < capture.values.length; rowIndex += 1) {
+    const values = capture.values[rowIndex];
+    if (values.every(value => value === '' || value === null)) continue;
+    const row = Object.fromEntries(capture.headers.map((header, column) => [header, values[column]]));
+    const identity = retireStableIdentity_(row[schema.id]);
+    if (records[identity]) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Duplicate Official stable identity: ' + identity);
+    records[identity] = { row: row, rowIndex: rowIndex };
+  }
+  return records;
+}
+
+function retireStableIdentity_(value) {
+  if (!['string', 'number'].includes(typeof value) || String(value).trim() === '') throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official stable identity is required');
+  return String(value).trim();
+}
+
+function retireNumberEquivalent_(expected, actual) {
+  const expectedNumber = typeof expected === 'number' ? expected : Number(String(expected).trim());
+  const actualNumber = typeof actual === 'number' ? actual : Number(String(actual).trim());
+  return Number.isFinite(expectedNumber) && Number.isFinite(actualNumber) && Object.is(expectedNumber, actualNumber);
+}
+
+function retireBooleanEquivalent_(expected, actual) {
+  const parse = value => {
+    if (value === true || value === 1 || (typeof value === 'string' && ['true', '1'].includes(value.toLowerCase()))) return true;
+    if (value === false || value === 0 || (typeof value === 'string' && ['false', '0'].includes(value.toLowerCase()))) return false;
+    return null;
+  };
+  const expectedValue = parse(expected), actualValue = parse(actual);
+  return expectedValue !== null && actualValue !== null && expectedValue === actualValue;
+}
+
+function retireTechnicalEquivalent_(expected, actual) {
+  if ((expected === '' || expected === null || expected === undefined) && (actual === '' || actual === null || actual === undefined)) return true;
+  if (expected instanceof Date || actual instanceof Date) return expected instanceof Date && actual instanceof Date && expected.getTime() === actual.getTime();
+  if (typeof expected === 'number' || typeof actual === 'number') return typeof expected === 'number' && typeof actual === 'number' && Object.is(expected, actual);
+  if (typeof expected === 'boolean' || typeof actual === 'boolean') return typeof expected === 'boolean' && typeof actual === 'boolean' && expected === actual;
+  return expected === actual;
+}
+
+function retireFieldEquivalent_(schema, field, expected, actual, expectedRow) {
+  if (field === schema.id) return retireStableIdentity_(expected) === retireStableIdentity_(actual);
+  if (['sort_order', '排序', 'start_age', 'end_age', 'spending_percent', 'default_growth_rate'].includes(field)) return retireNumberEquivalent_(expected, actual);
+  if (['visible', 'protected', 'active', 'enabled', 'detail_default_open', '啟用'].includes(field)) return retireBooleanEquivalent_(expected, actual);
+  if (schema.domain === 'settings' && field === 'value' && expectedRow.type === 'number') return retireNumberEquivalent_(expected, actual);
+  if (schema.domain === 'settings' && field === 'value' && expectedRow.type === 'boolean') return retireBooleanEquivalent_(expected, actual);
+  return retireTechnicalEquivalent_(expected, actual);
+}
+
+function retireAssertCaptureShape_(before, after) {
+  if (JSON.stringify(before.headers) !== JSON.stringify(after.headers) || before.values.length !== after.values.length || before.headers.length !== after.headers.length) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official Sheet structure changed during write');
+}
+
+function retireVerifyPersistence_(sheet, schema, beforeSnapshot, beforePayload, expectedRows, afterPayload) {
+  const afterSnapshot = retireCapture_(sheet);
+  retireAssertCaptureShape_(beforeSnapshot, afterSnapshot);
+  const beforeRecords = retireCaptureRecords_(beforeSnapshot, schema), afterRecords = retireCaptureRecords_(afterSnapshot, schema);
+  const expectedKeys = expectedRows.map(row => retireStableIdentity_(row[schema.id]));
+  const actualKeys = Object.keys(afterRecords);
+  if (expectedKeys.length !== actualKeys.length || new Set(expectedKeys).size !== expectedKeys.length || expectedKeys.some(key => !afterRecords[key])) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official persisted record set does not match the submitted record set');
+  expectedRows.forEach(expected => {
+    const identity = retireStableIdentity_(expected[schema.id]), actual = afterRecords[identity].row;
+    schema.fields.forEach(field => { if (!retireFieldEquivalent_(schema, field, expected[field], actual[field], expected)) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official persisted field mismatch: ' + field); });
+  });
+  const payloadRecords = {};
+  (afterPayload.data[schema.domain] || []).forEach(row => {
+    const identity = retireStableIdentity_(row[schema.id]);
+    if (payloadRecords[identity]) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Duplicate persisted payload identity: ' + identity);
+    payloadRecords[identity] = row;
+  });
+  if (Object.keys(payloadRecords).length !== expectedKeys.length || expectedKeys.some(key => !payloadRecords[key])) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Persisted payload record set does not match the Sheet read-back');
+  expectedRows.forEach(expected => {
+    const identity = retireStableIdentity_(expected[schema.id]), payloadRow = payloadRecords[identity];
+    schema.fields.forEach(field => { if (!retireFieldEquivalent_(schema, field, expected[field], payloadRow[field], expected)) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Persisted payload mismatch: ' + field); });
+  });
+  (RETIRE_READ_ONLY_FIELDS[schema.domain] || []).forEach(field => {
+    Object.keys(beforeRecords).forEach(identity => { if (!retireFieldEquivalent_(schema, field, beforeRecords[identity].row[field], afterRecords[identity].row[field], beforeRecords[identity].row)) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Protected Official field changed: ' + field); });
+  });
+  (RETIRE_READ_ONLY_FIELDS[schema.domain] || []).forEach(field => {
+    const column = beforeSnapshot.headers.indexOf(field);
+    if (column < 0) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Protected Official header is unavailable: ' + field);
+    Object.keys(beforeRecords).forEach(identity => {
+      const beforeRow = beforeRecords[identity].rowIndex, afterRow = afterRecords[identity].rowIndex;
+      if (beforeSnapshot.formulas[beforeRow][column] !== afterSnapshot.formulas[afterRow][column] || !retireTechnicalEquivalent_(beforeSnapshot.numberFormats[beforeRow][column], afterSnapshot.numberFormats[afterRow][column])) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Protected Official metadata changed: ' + field);
+    });
+  });
+  const schemaFields = new Set(schema.fields);
+  Object.keys(beforeRecords).forEach(identity => {
+    const beforeRecord = beforeRecords[identity], afterRecord = afterRecords[identity];
+    beforeSnapshot.headers.forEach((header, column) => {
+      if (schemaFields.has(header)) return;
+      const beforeFormula = beforeSnapshot.formulas[beforeRecord.rowIndex][column], afterFormula = afterSnapshot.formulas[afterRecord.rowIndex][column];
+      if (beforeFormula !== afterFormula || !retireTechnicalEquivalent_(beforeSnapshot.numberFormats[beforeRecord.rowIndex][column], afterSnapshot.numberFormats[afterRecord.rowIndex][column])) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Unknown Official column changed: ' + header);
+      if (!beforeFormula && !afterFormula && !retireTechnicalEquivalent_(beforeSnapshot.values[beforeRecord.rowIndex][column], afterSnapshot.values[afterRecord.rowIndex][column])) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Unknown Official value changed: ' + header);
+    });
+  });
+  return afterPayload;
+}
+
+function retireAssertCaptureEqual_(before, after) {
+  retireAssertCaptureShape_(before, after);
+  for (let row = 0; row < before.values.length; row += 1) for (let column = 0; column < before.headers.length; column += 1) {
+    if (!retireTechnicalEquivalent_(before.values[row][column], after.values[row][column]) || before.formulas[row][column] !== after.formulas[row][column] || !retireTechnicalEquivalent_(before.numberFormats[row][column], after.numberFormats[row][column])) throw retireError_('ROLLBACK_FAILED', 'Rollback read-back differs from the original snapshot');
+  }
+}
+
+function retireVerifyRollback_(sheet, snapshot, beforePayload, beforeRevision) {
+  const restored = retireCapture_(sheet);
+  retireAssertCaptureEqual_(snapshot, restored);
+  const restoredPayload = retireOfficialPayload_();
+  const restoredRevision = retireRevision_(restoredPayload);
+  if (restoredRevision !== beforeRevision) throw retireError_('ROLLBACK_FAILED', 'Rollback revision does not match the original revision');
+  return { attempted: true, verified: true, revision: restoredRevision };
+}
+
+function retireRestore_(sheet, snapshot) {
+  const current = sheet.getDataRange();
+  const currentValues = current.getValues();
+  if (currentValues.length > snapshot.values.length) sheet.getRange(snapshot.values.length + 1, 1, currentValues.length - snapshot.values.length, currentValues[0].length).clearContent();
+  if (currentValues[0].length > snapshot.headers.length) sheet.getRange(1, snapshot.headers.length + 1, snapshot.values.length, currentValues[0].length - snapshot.headers.length).clearContent();
+  const range = sheet.getRange(1, 1, snapshot.values.length, snapshot.headers.length);
+  range.setValues(snapshot.values);
+  snapshot.formulas.forEach((row, rowIndex) => row.forEach((formula, column) => { if (formula) sheet.getRange(rowIndex + 1, column + 1).setFormula(formula); }));
+  range.setNumberFormats(snapshot.numberFormats);
+}
 function retireHeaders_(sheet) { return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String); }
 function retireSheet_(name) { const sheet = SpreadsheetApp.getActive().getSheetByName(name); if (!sheet) throw new Error('Configured Official sheet is unavailable'); return sheet; }
 function retireRows_(sheet) {
