@@ -50,7 +50,7 @@ test('Retire backend uses Mother grant verification and fixed schema routes', ()
   assert.match(gas, /Official identifiers cannot change/);
   assert.match(gas, /expectedRevision/);
   assert.match(gas, /Official revision conflict/);
-  assert.match(gas, /retireRestoreSheet_/);
+  assert.match(gas, /retireRestoreSchemaColumns_/);
   assert.doesNotMatch(gas, /SpreadsheetApp\.openById\(body|\.getRange\(body/);
   assert.doesNotMatch(gas, /localStorage|sessionStorage|ADMIN_PASSWORD|private.?key/i);
 });
