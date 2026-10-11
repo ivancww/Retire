@@ -7,6 +7,7 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 const auth = read('src/admin-auth.js');
 const admin = read('src/admin.js');
 const gas = read('gas/RetireAdminApi.gs');
+const completeGas = read('gas/RetireCompleteCandidate.gs');
 const index = read('index.html');
 const main = read('src/main.js');
 
@@ -50,7 +51,9 @@ test('Retire backend uses Mother grant verification and fixed schema routes', ()
   assert.match(gas, /Official identifiers cannot change/);
   assert.match(gas, /expectedRevision/);
   assert.match(gas, /Official revision conflict/);
-  assert.match(gas, /retireRestoreSchemaColumns_/);
+  assert.match(gas, /retireAdminRestore_/);
+  assert.match(gas, /retireAdminVerifyPersistence_/);
+  assert.match(gas, /retireAdminVerifyRollback_/);
   assert.doesNotMatch(gas, /SpreadsheetApp\.openById\(body|\.getRange\(body/);
   assert.doesNotMatch(gas, /localStorage|sessionStorage|ADMIN_PASSWORD|private.?key/i);
 });
@@ -61,6 +64,10 @@ test('Admin write flow requires positive acknowledgement and server re-read', ()
   assert.match(admin, /request\('readOfficialConfig'\)/);
   assert.match(gas, /acknowledged: true/);
   assert.match(gas, /retireOfficialPayload_\(\)/);
+  assert.match(completeGas, /retireVerifyPersistence_/);
+  assert.match(completeGas, /retireVerifyRollback_/);
+  assert.match(completeGas, /persisted: true/);
+  assert.match(completeGas, /ROLLBACK_FAILED/);
 });
 
 test('Admin uses semantic true tabs, structured labels, typed controls, and preserves dirty drafts', () => {
@@ -76,6 +83,14 @@ test('Admin uses semantic true tabs, structured labels, typed controls, and pres
   assert.deepEqual(editableFieldsFor('returnRegistry', { plan_id: 'p', '分頁名稱': 's', '前台顯示名稱': 'x', '排序': 10, '啟用': true }), ['前台顯示名稱', '排序', '啟用']);
   assert.equal(fieldLabel('page_id'), '頁面 ID');
   assert.equal(fieldLabel('sort_order'), '排序');
+});
+
+test('Frontend keeps the confirmed Official state and draft on uncertain writes', () => {
+  assert.match(admin, /state\.official = reread\.official; state\.revision = String\(reread\.revision\); state\.dirty = false/);
+  assert.match(admin, /catch \(error\) \{ state\.status = `保存失敗/);
+  assert.doesNotMatch(admin, /catch \(error\) \{[^}]*state\.official\s*=/);
+  assert.match(admin, /伺服器未提供完整 Official 持久化證據/);
+  assert.match(admin, /伺服器重新讀取的 Official 資料與提交內容不一致/);
 });
 
 console.log('Retire secure Admin contract, negative authorization/schema cases, and Official acknowledgement checks passed');
