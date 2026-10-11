@@ -8,23 +8,74 @@ const source = fs.readFileSync(new URL('../gas/RetireCompleteCandidate.gs', impo
 
 class Range {
   constructor(sheet, row, column, numRows, numColumns) { this.sheet = sheet; this.row = row; this.column = column; this.numRows = numRows; this.numColumns = numColumns; }
-  getValues() { return this.sheet.data.slice(this.row - 1, this.row - 1 + this.numRows).map(values => values.slice(this.column - 1, this.column - 1 + this.numColumns)); }
+  getValues() {
+    if (this.sheet.failReadsAfterFailure && this.sheet.afterFailure) throw new Error('fixture rollback verification read failure');
+    if (this.sheet.failReadsAfterWriteOnce && this.sheet.setCount > 0) { this.sheet.failReadsAfterWriteOnce = false; throw new Error('fixture read-after-write failure'); }
+    const values = this.sheet.data.slice(this.row - 1, this.row - 1 + this.numRows).map(values => values.slice(this.column - 1, this.column - 1 + this.numColumns));
+    if (this.sheet.readHook) this.sheet.readHook(this.sheet, values);
+    return values;
+  }
+  getFormulas() { return this.sheet.formulas.slice(this.row - 1, this.row - 1 + this.numRows).map(values => values.slice(this.column - 1, this.column - 1 + this.numColumns)); }
+  getNumberFormats() { return this.sheet.numberFormats.slice(this.row - 1, this.row - 1 + this.numRows).map(values => values.slice(this.column - 1, this.column - 1 + this.numColumns)); }
   setValues(values) {
     for (let r = 0; r < values.length; r += 1) for (let c = 0; c < values[r].length; c += 1) this.sheet.data[this.row - 1 + r][this.column - 1 + c] = values[r][c];
-    if (this.sheet.failAfterSet) { this.sheet.failAfterSet = false; throw new Error('fixture read-after-write failure'); }
+    for (let r = 0; r < values.length; r += 1) for (let c = 0; c < values[r].length; c += 1) this.sheet.formulas[this.row - 1 + r][this.column - 1 + c] = '';
+    this.sheet.setCount += 1;
+    if (this.sheet.postSetHook) this.sheet.postSetHook(this.sheet);
+    if (this.sheet.failOnSetCall === this.sheet.setCount) { this.sheet.failOnSetCall = null; this.sheet.afterFailure = true; throw new Error('fixture mutation failure'); }
+    if (this.sheet.afterFailure && this.sheet.corruptRollbackWrites) this.sheet.data[1][1] = 999;
+  }
+  setFormula(formula) {
+    this.sheet.formulas[this.row - 1][this.column - 1] = formula;
+    this.sheet.data[this.row - 1][this.column - 1] = formula;
+  }
+  setNumberFormats(formats) {
+    if (this.sheet.failOnNumberFormatSet && this.sheet.afterFailure) throw new Error('fixture metadata restore failure');
+    for (let r = 0; r < formats.length; r += 1) for (let c = 0; c < formats[r].length; c += 1) this.sheet.numberFormats[this.row - 1 + r][this.column - 1 + c] = formats[r][c];
+  }
+  clearContent() {
+    if (this.sheet.failOnClear) throw new Error('fixture clear failure');
+    for (let r = 0; r < this.numRows; r += 1) for (let c = 0; c < this.numColumns; c += 1) {
+      const row = this.row - 1 + r, column = this.column - 1 + c;
+      if (this.sheet.data[row]) this.sheet.data[row][column] = '';
+      if (this.sheet.formulas[row]) this.sheet.formulas[row][column] = '';
+    }
   }
 }
 
 class Sheet {
-  constructor(name, data) { this.name = name; this.data = data.map(row => [...row]); this.failAfterSet = false; }
-  getDataRange() { return new Range(this, 1, 1, this.data.length, this.data[0].length); }
+  constructor(name, data) {
+    this.name = name;
+    this.data = data.map(row => [...row]);
+    this.formulas = this.data.map(row => row.map(value => typeof value === 'string' && value.startsWith('=') ? value : ''));
+    this.numberFormats = this.data.map(row => row.map(() => 'General'));
+    this.failOnSetCall = null;
+    this.failReadsAfterWriteOnce = false;
+    this.failReadsAfterFailure = false;
+    this.failOnNumberFormatSet = false;
+    this.failOnClear = false;
+    this.postSetHook = null;
+    this.readHook = null;
+    this.setCount = 0;
+    this.afterFailure = false;
+    this.corruptRollbackWrites = false;
+  }
+  getDataRange() { return new Range(this, 1, 1, this.getLastRow(), this.getLastColumn()); }
   getRange(row, column, numRows = 1, numColumns = 1) { return new Range(this, row, column, numRows, numColumns); }
-  getLastColumn() { return this.data[0].length; }
-  getLastRow() { return this.data.length; }
+  getLastColumn() {
+    let last = 1;
+    this.data.forEach((row, rowIndex) => row.forEach((value, column) => { if (value !== '' && value !== null && value !== undefined || this.formulas[rowIndex][column]) last = Math.max(last, column + 1); }));
+    return last;
+  }
+  getLastRow() {
+    let last = 1;
+    this.data.forEach((row, rowIndex) => { if (row.some((value, column) => value !== '' && value !== null && value !== undefined || this.formulas[rowIndex][column])) last = Math.max(last, rowIndex + 1); });
+    return last;
+  }
 }
 
 class Spreadsheet {
-  constructor(sheets) { this.sheets = new Map(sheets.map(sheet => [sheet.name, sheet])); }
+  constructor(sheets) { this.sheets = new Map(sheets.map(sheet => [sheet.name, sheet])); this.failFlushOnce = false; }
   getSheetByName(name) { return this.sheets.get(name); }
 }
 
@@ -61,6 +112,7 @@ function setup() {
     },
     ContentService: { MimeType: { JSON: 'application/json' }, createTextOutput: value => ({ value, setMimeType() { return this; }, getContentText() { return this.value; } }) }
   };
+  context.SpreadsheetApp.flush = () => { if (spreadsheet.failFlushOnce) { spreadsheet.failFlushOnce = false; throw new Error('fixture flush failure'); } };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: 'RetireCompleteCandidate.gs' });
   const post = body => JSON.parse(context.doPost({ postData: { contents: JSON.stringify(body) } }).getContentText());
@@ -81,6 +133,10 @@ test('complete GAS candidate has one GET and one POST entry point', () => {
   assert.match(source, /Return-plan data is read-only/);
   assert.match(source, /LockService\.getScriptLock/);
   assert.match(source, /serverReadAfterWrite: true/);
+  assert.match(source, /retireVerifyPersistence_/);
+  assert.match(source, /retireVerifyRollback_/);
+  assert.match(source, /ROLLBACK_FAILED/);
+  assert.match(source, /WRITE_ROLLED_BACK/);
 });
 
 test('fixture GET contract and dynamic registry preserve six read-only plans', () => {
@@ -123,7 +179,7 @@ test('fixture Admin authorization, all writable domains, revision, lock, and rea
     payload[0][field] = value;
     const operation = { settings: 'updateSettings', pages: 'updatePageSettings', options: 'updateOptions', stages: 'updateRetirementStages', assets: 'updateAssetCategories', calculations: 'updateCalculationSettings', returnRegistry: 'updateReturnPlanRegistry' }[domain];
     const saved = env.post({ action: operation, adminSessionProof: proof, rows: payload, expectedRevision: revision });
-    assert.equal(saved.success, true, `${domain} write failed: ${saved.error}`);
+    assert.equal(saved.success, true, `${domain} write failed: ${JSON.stringify(saved)}`);
     assert.equal(saved.acknowledged, true);
     assert.equal(saved.persisted, true);
     assert.equal(saved.readAfterWrite, true);
@@ -168,10 +224,89 @@ test('fixture writes only allowlisted columns and restores them after a failed w
   const originalValue = after.official.domains.settings[0].value;
   const failingRows = structuredClone(after.official.domains.settings);
   failingRows[0].value = 68;
-  settings.failAfterSet = true;
+  settings.failOnSetCall = settings.setCount + 2;
   const failed = env.post({ action: 'updateSettings', adminSessionProof: proof, rows: failingRows, expectedRevision: after.revision });
   assert.equal(failed.success, false);
   assert.equal(settings.data[1][1], originalValue);
   assert.equal(settings.data[1][4], formulaBefore);
+});
+
+function prepareSettingsFault(config = {}) {
+  const env = setup();
+  const proof = auth(env);
+  const read = env.post({ action: 'readOfficialConfig', adminSessionProof: proof });
+  const settings = env.spreadsheet.getSheetByName('設定');
+  const { failFlushOnce, ...sheetConfig } = config;
+  Object.assign(settings, sheetConfig);
+  if (failFlushOnce) env.spreadsheet.failFlushOnce = true;
+  const rowsToWrite = structuredClone(read.official.domains.settings);
+  rowsToWrite[0].value = 70;
+  const result = env.post({ action: 'updateSettings', adminSessionProof: proof, rows: rowsToWrite, expectedRevision: read.revision });
+  return { env, settings, result };
+}
+
+test('fault injection rejects every persistence mismatch and never reports success', () => {
+  const cases = [
+    ['submitted field persisted incorrectly', { postSetHook: sheet => { if (sheet.setCount <= 2) sheet.data[1][1] = 999; } }],
+    ['silent Google Sheets value mismatch', { readHook: (sheet, values) => { if (sheet.setCount > 0 && !sheet.readCorrupted) { sheet.readCorrupted = true; values[1][1] = 999; } } }],
+    ['missing persisted record', { postSetHook: sheet => { if (sheet.setCount <= 2) sheet.data[1].fill(''); } }],
+    ['extra unexpected record', { postSetHook: sheet => { if (sheet.setCount === 1) { sheet.data.push([...sheet.data[1]]); sheet.formulas.push([...sheet.formulas[1]]); sheet.numberFormats.push([...sheet.numberFormats[1]]); } } }],
+    ['stable identity mismatch', { postSetHook: sheet => { if (sheet.setCount <= 2) sheet.data[1][0] = 'changed-id'; } }],
+    ['protected field changed unexpectedly', { postSetHook: sheet => { if (sheet.setCount <= 2) sheet.data[1][2] = 'text'; } }]
+  ];
+  for (const [label, config] of cases) {
+    const { result } = prepareSettingsFault(config);
+    assert.equal(result.success, false, label);
+    assert.notEqual(result.persisted, true, label);
+    assert.notEqual(result.readAfterWrite, true, label);
+    assert.equal(result.failureCode, 'WRITE_ROLLED_BACK', label);
+    assert.equal(result.rollback.verified, true, label);
+  }
+});
+
+test('fault injection covers mutation, flush, metadata, read-after-write, and rollback failures', () => {
+  const rolledBack = [
+    ['target-cell mutation failure', { failOnSetCall: 2 }],
+    ['Spreadsheet flush failure', { failFlushOnce: true }],
+    ['read-after-write failure', { failReadsAfterWriteOnce: true }]
+  ];
+  for (const [label, config] of rolledBack) {
+    const { env, result } = prepareSettingsFault(config);
+    assert.equal(result.success, false, label);
+    assert.equal(result.failureCode, 'WRITE_ROLLED_BACK', label);
+    assert.equal(result.rollback.verified, true, label);
+    assert.equal(env.spreadsheet.getSheetByName('設定').data[1][1], 65, label);
+  }
+
+  const rollbackFailed = [
+    ['metadata restore failure', { failOnSetCall: 2, failOnNumberFormatSet: true }],
+    ['rollback silently fails', { failOnSetCall: 2, corruptRollbackWrites: true }],
+    ['rollback read-back differs', { failOnSetCall: 2, readHook: (sheet, values) => { if (sheet.setCount > 0) values[1][1] = 999; } }],
+    ['rollback verification throws', { failOnSetCall: 2, failReadsAfterFailure: true }]
+  ];
+  for (const [label, config] of rollbackFailed) {
+    const { result } = prepareSettingsFault(config);
+    assert.equal(result.success, false, label);
+    assert.equal(result.persisted, false, label);
+    assert.equal(result.failureCode, 'ROLLBACK_FAILED', label);
+    assert.equal(result.rollback.verified, false, label);
+  }
+});
+
+test('successful publish returns only verified persisted evidence and preserves unknown columns', () => {
+  const env = setup();
+  const proof = auth(env);
+  const read = env.post({ action: 'readOfficialConfig', adminSessionProof: proof });
+  const settings = env.spreadsheet.getSheetByName('設定');
+  const rowsToWrite = structuredClone(read.official.domains.settings);
+  rowsToWrite[0].value = 71;
+  const result = env.post({ action: 'updateSettings', adminSessionProof: proof, rows: rowsToWrite, expectedRevision: read.revision });
+  assert.equal(result.success, true);
+  assert.equal(result.persisted, true);
+  assert.equal(result.readAfterWrite, true);
+  assert.equal(result.evidence.serverReadAfterWrite, true);
+  assert.equal(result.evidence.revision, result.revision);
+  assert.equal(result.official.domains.settings[0].value, 71);
+  assert.equal(settings.data[1][4], '=B2*1');
 });
 
