@@ -80,13 +80,13 @@ function retireReplaceDomain_(schema, rows, expectedRevision) {
   try {
     const lockedBefore = retireOfficialPayload_();
     if (String(expectedRevision) !== retireRevision_(lockedBefore)) throw new Error('Official revision conflict; reload before saving');
-    snapshot = sheet.getDataRange().getValues();
+    snapshot = retireSnapshotSchemaColumns_(sheet, schema, normalized.length);
     retireWriteSchemaRows_(sheet, schema, normalized);
     const after = retireOfficialPayload_();
     const afterRevision = retireRevision_(after);
     return { success: true, appId: RETIRE_ADMIN_APP_ID, acknowledged: true, persisted: true, readAfterWrite: true, revision: afterRevision, operation: Object.keys(RETIRE_ADMIN_SCHEMAS).find(key => RETIRE_ADMIN_SCHEMAS[key] === schema), official: retireAdminConfig_(after) };
   } catch (error) {
-    if (snapshot) retireRestoreSheet_(sheet, snapshot);
+    if (snapshot) retireRestoreSchemaColumns_(sheet, snapshot);
     throw error;
   } finally { lock.releaseLock(); }
 }
@@ -122,14 +122,18 @@ function retireAssertProtectedFields_(domain, row, existing) {
 }
 
 function retireWriteSchemaRows_(sheet, schema, rows) {
-  const range = sheet.getDataRange(); const values = range.getValues(); const headers = values[0].map(String);
-  const columns = schema.fields.map(field => { const index = headers.indexOf(field); if (index < 0) throw new Error(`Configured Official header is unavailable: ${field}`); return index; });
-  if (values.length - 1 !== rows.length) throw new Error('Official row count cannot change');
-  rows.forEach((row, rowIndex) => columns.forEach((columnIndex, fieldIndex) => { values[rowIndex + 1][columnIndex] = row[schema.fields[fieldIndex]]; }));
-  range.setValues(values);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  const columns = schema.fields.map(field => { const index = headers.indexOf(field); if (index < 0) throw new Error(`Configured Official header is unavailable: ${field}`); return index + 1; });
+  if (sheet.getLastRow() - 1 !== rows.length) throw new Error('Official row count cannot change');
+  columns.forEach((column, fieldIndex) => sheet.getRange(2, column, rows.length, 1).setValues(rows.map(row => [row[schema.fields[fieldIndex]]] )));
 }
 
-function retireRestoreSheet_(sheet, snapshot) { const range = sheet.getDataRange(); if (range.getNumRows() !== snapshot.length || range.getNumColumns() !== snapshot[0].length) throw new Error('Rollback shape mismatch'); range.setValues(snapshot); }
+function retireSnapshotSchemaColumns_(sheet, schema, rowCount) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(String);
+  return schema.fields.map(field => { const index = headers.indexOf(field); if (index < 0) throw new Error(`Configured Official header is unavailable: ${field}`); return { column: index + 1, values: sheet.getRange(2, index + 1, rowCount, 1).getValues() }; });
+}
+
+function retireRestoreSchemaColumns_(sheet, snapshot) { snapshot.forEach(entry => sheet.getRange(2, entry.column, entry.values.length, 1).setValues(entry.values)); }
 
 function retireCoerce_(field, value) {
   if (['sort_order', '排序', 'start_age', 'end_age', 'spending_percent', 'default_growth_rate'].includes(field)) { const number = Number(value); if (!Number.isFinite(number)) throw new Error(`Invalid number: ${field}`); return number; }
