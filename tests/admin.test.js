@@ -87,7 +87,7 @@ test('Admin uses semantic true tabs, structured labels, typed controls, and pres
 
 test('Frontend keeps the confirmed Official state and draft on uncertain writes', () => {
   assert.match(admin, /state\.official = reread\.official; state\.revision = String\(reread\.revision\); state\.dirty = false/);
-  assert.match(admin, /catch \(error\) \{ state\.status = `保存失敗/);
+  assert.match(admin, /state\.status = `保存失敗：/);
   assert.doesNotMatch(admin, /catch \(error\) \{[^}]*state\.official\s*=/);
   assert.match(admin, /伺服器未提供完整 Official 持久化證據/);
   assert.match(admin, /伺服器重新讀取的 Official 資料與提交內容不一致/);
