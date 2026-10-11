@@ -85,16 +85,25 @@ test('complete GAS candidate has one GET and one POST entry point', () => {
 
 test('fixture GET contract and dynamic registry preserve six read-only plans', () => {
   const env = setup();
-  assert.deepEqual(env.get({ action: 'health' }), { ok: true, app: 'Retire', apiVersion: '2.0.0' });
+  const health = env.get({ action: 'health' });
+  assert.equal(health.ok, true);
+  assert.equal(health.app, 'Retire');
+  assert.equal(health.apiVersion, '2.0.0');
+  assert.match(health.timestamp, /^\d{4}-\d\d-\d\dT/);
   const bootstrap = env.get({ action: 'bootstrap' });
   assert.equal(bootstrap.ok, true);
-  assert.deepEqual(Object.keys(bootstrap.data), ['settings', 'pages', 'options', 'stages', 'assets', 'calculations', 'returnRegistry']);
+  assert.deepEqual(Object.keys(bootstrap.data), ['設定', '頁面設定', '選項設定', '退休階段', '資產類別', '計算設定', '回報表設定']);
   assert.equal(bootstrap.returnPlans.length, 6);
   assert.equal(bootstrap.returnPlans[0].displayName, 'Plan 1');
-  assert.equal(bootstrap.returnTables.auto[0].withdrawalPercent, 4);
-  assert.equal(env.get({ action: 'returnPlans' }).returnPlans.length, 6);
-  const sheet = env.get({ action: 'sheet', sheetName: '設定' });
-  assert.deepEqual(sheet.headers, ['key', 'value', 'type', 'description', 'formula']);
+  assert.equal(bootstrap.returnPlans[0].rows[0].withdrawalPercent, 4);
+  assert.equal(bootstrap.returnTables, undefined);
+  const returnPlans = env.get({ action: 'returnPlans' });
+  assert.equal(returnPlans.returnPlans.length, 6);
+  assert.equal(returnPlans.generatedAt.startsWith('20'), true);
+  const sheet = env.get({ action: 'sheet', name: '設定' });
+  assert.equal(sheet.sheet, '設定');
+  assert.equal(sheet.headers, undefined);
+  assert.equal(sheet.rows[0].key, 'retire_age');
 });
 
 test('fixture Admin authorization, all writable domains, revision, lock, and read-after-write', () => {
