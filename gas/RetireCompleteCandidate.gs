@@ -277,7 +277,7 @@ function retireSnapshot_(sheet, schema) {
 }
 
 function retireCaptureRecords_(capture, schema) {
-  const records = {};
+  const records = Object.create(null);
   for (let rowIndex = 1; rowIndex < capture.values.length; rowIndex += 1) {
     const values = capture.values[rowIndex];
     if (values.every(value => value === '' || value === null)) continue;
@@ -328,7 +328,8 @@ function retireFieldEquivalent_(schema, field, expected, actual, expectedRow) {
 }
 
 function retireAssertCaptureShape_(before, after) {
-  if (JSON.stringify(before.headers) !== JSON.stringify(after.headers) || before.values.length !== after.values.length || before.headers.length !== after.headers.length) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official Sheet structure changed during write');
+  const valid = capture => [capture.values, capture.formulas, capture.numberFormats].every(matrix => matrix.length === capture.values.length && matrix.every(row => row.length === capture.headers.length));
+  if (!valid(before) || !valid(after) || JSON.stringify(before.headers) !== JSON.stringify(after.headers) || before.values.length !== after.values.length || before.headers.length !== after.headers.length) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official Sheet structure changed during write');
 }
 
 function retireVerifyPersistence_(sheet, schema, beforeSnapshot, beforePayload, expectedRows, afterPayload) {
@@ -342,7 +343,7 @@ function retireVerifyPersistence_(sheet, schema, beforeSnapshot, beforePayload, 
     const identity = retireStableIdentity_(expected[schema.id]), actual = afterRecords[identity].row;
     schema.fields.forEach(field => { if (!retireFieldEquivalent_(schema, field, expected[field], actual[field], expected)) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Official persisted field mismatch: ' + field); });
   });
-  const payloadRecords = {};
+  const payloadRecords = Object.create(null);
   (afterPayload.data[schema.domain] || []).forEach(row => {
     const identity = retireStableIdentity_(row[schema.id]);
     if (payloadRecords[identity]) throw retireError_('PERSISTENCE_VERIFICATION_FAILED', 'Duplicate persisted payload identity: ' + identity);
