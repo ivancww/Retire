@@ -6,6 +6,7 @@
 .ava-management__sidebar { display: flex; align-self: start; gap: var(--ava-space-8); padding: var(--ava-space-8); overflow-x: auto; }
 .ava-management__sidebar-button { flex-shrink: 0; min-height: var(--ava-touch-target); padding: var(--ava-space-8) var(--ava-space-12); color: var(--ava-color-text-secondary); text-align: start; font: inherit; background: transparent; border: var(--ava-border-width) solid transparent; border-radius: var(--ava-control-radius); cursor: pointer; }
 .ava-management__sidebar-button[aria-current="page"] { color: var(--ava-color-brand); background: var(--ava-color-selected); font-weight: var(--ava-weight-bold); }
+.ava-management__sidebar-button[aria-selected="true"] { color: var(--ava-color-brand); background: var(--ava-color-selected); font-weight: var(--ava-weight-bold); }
 .ava-management__content { padding: var(--ava-card-padding); }
 .ava-management__card { position: relative; padding: var(--ava-card-padding); margin-bottom: var(--ava-space-16); background: var(--ava-color-surface); border: var(--ava-border-width) solid var(--ava-color-border); border-radius: var(--ava-card-radius); }
 .ava-management__form { display: grid; gap: var(--ava-space-16); }
@@ -18,5 +19,7 @@
 .retire-admin-table input { width: 100%; min-width: 96px; }
 .retire-admin-identity { display: grid; gap: var(--ava-space-4); }
 .retire-admin-identity small { color: var(--ava-color-on-primary); opacity: .8; }
+.retire-system-info { margin-top: var(--ava-space-16); padding: var(--ava-space-12); border: var(--ava-border-width) dashed var(--ava-color-border); border-radius: var(--ava-card-radius); }
+.admin-readonly { display: block; min-height: var(--ava-touch-target); padding: var(--ava-space-8); color: var(--ava-color-text-secondary); background: var(--ava-color-background); border-radius: var(--ava-control-radius); overflow-wrap: anywhere; }
 @media (max-width: 650px) { .ava-management__actions { flex-direction: column; align-items: stretch; } }
 @media (min-width: 1001px) { .ava-management__workspace { grid-template-columns: var(--ava-sidebar-width) minmax(0, 1fr); } .ava-management__sidebar { position: sticky; top: var(--ava-space-20); display: grid; max-height: calc(100dvh - var(--ava-space-42)); overflow-y: auto; } }

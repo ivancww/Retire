@@ -35,7 +35,7 @@ test('Return AVA is a standalone bordered header control', () => {
 
 test('production Frontstage uses the canonical app version in its identity', () => {
   const source = fs.readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-  assert.equal(APP_VERSION, '0.6.0');
+  assert.equal(APP_VERSION, '0.7.0');
   assert.match(source, /brand-version/);
   assert.match(source, /V\$\{APP_VERSION\}/);
 });
