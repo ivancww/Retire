@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { DOMAIN_LABELS, DOMAIN_OPERATIONS, operationFor, validateRows } from '../src/admin-contract.js';
+import { DOMAIN_LABELS, DOMAIN_OPERATIONS, fieldLabel, operationFor, validateRows } from '../src/admin-contract.js';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const auth = read('src/admin-auth.js');
@@ -57,6 +57,17 @@ test('Admin write flow requires positive acknowledgement and server re-read', ()
   assert.match(admin, /request\('readOfficialConfig'\)/);
   assert.match(gas, /acknowledged: true/);
   assert.match(gas, /retireOfficialPayload_\(\)/);
+});
+
+test('Admin uses semantic true tabs, structured labels, typed controls, and preserves dirty drafts', () => {
+  assert.match(admin, /role="tablist"/);
+  assert.match(admin, /role="tab"/);
+  assert.match(admin, /role="tabpanel"/);
+  assert.match(admin, /目前有未保存的編輯/);
+  assert.match(admin, /admin-cell.*data-original-type/);
+  assert.match(admin, /伺服器重新讀取的 Official 資料與提交內容不一致/);
+  assert.equal(fieldLabel('page_id'), '頁面 ID');
+  assert.equal(fieldLabel('sort_order'), '排序');
 });
 
 console.log('Retire secure Admin contract, negative authorization/schema cases, and Official acknowledgement checks passed');
